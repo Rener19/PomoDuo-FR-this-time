@@ -1,4 +1,5 @@
 import notifee, { AndroidImportance, TimestampTrigger, TriggerType, AndroidVisibility, AndroidCategory } from 'react-native-notify-kit';
+import { Platform } from 'react-native';
 import { useSettingsStore } from '@/store/settingsStore';
 
 let isServiceRunning = false;
@@ -21,7 +22,7 @@ export async function startForegroundService(mode: string, timeLeft: number, tar
     });
   }
 
-  if (!isServiceRunning) {
+  if (Platform.OS === 'android' && !isServiceRunning) {
     isServiceRunning = true;
     notifee.registerForegroundService((notification) => {
       return new Promise((resolve) => {
@@ -131,6 +132,10 @@ export async function updateTimerNotification(mode: string, timeLeft: number, is
           pressAction: { id: 'default' },
           category: AndroidCategory.ALARM,
         },
+        ios: {
+          sound: 'default',
+          interruptionLevel: 'timeSensitive',
+        },
       };
 
       try {
@@ -155,7 +160,11 @@ export async function stopForegroundService() {
   await notifee.cancelTriggerNotification('timer-end-focus');
   await notifee.cancelNotification('timer-end-break');
   await notifee.cancelTriggerNotification('timer-end-break');
-  await notifee.stopForegroundService();
+  
+  if (Platform.OS === 'android') {
+    await notifee.stopForegroundService();
+  }
+  
   if (stopServiceCallback) {
     stopServiceCallback();
     stopServiceCallback = null;

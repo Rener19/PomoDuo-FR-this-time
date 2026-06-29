@@ -158,6 +158,10 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
       }));
     })
     .on('broadcast', { event: 'timer_sync' }, ({ payload }) => {
+      // The host is the source of truth and already updated local state before broadcasting.
+      // Ignoring own broadcast prevents network delay from shifting the host's UI clock out of sync with the alarm.
+      if (get().isHost) return;
+
       // Use payload.timeLeft to calculate our local targetEndTime to avoid device clock drift
       let timeLeft = payload.timeLeft;
       let localTargetEndTime = null;
@@ -263,6 +267,9 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   },
 
   inviteFriends: async (hostId, hostUsername, friendIds, focusMin, breakMin, mode = 'focus', timeLeft, isRunning = false) => {
+    // Optimistic update
+    set((state) => ({ sentInvites: [...state.sentInvites, ...friendIds] }));
+
     // 1. Create the duo session
     const { data: session, error } = await supabase
       .from('duo_sessions')
@@ -305,6 +312,9 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   },
 
   inviteMoreFriends: async (hostId, friendIds) => {
+    // Optimistic update
+    set((state) => ({ sentInvites: [...state.sentInvites, ...friendIds] }));
+
     const sessionId = get().sessionId;
     if (!sessionId) return;
     const invites = friendIds.map((fid) => ({
@@ -324,6 +334,9 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   },
 
   cancelSentInvite: async (friendId: string) => {
+    // Optimistic update
+    set((state) => ({ sentInvites: state.sentInvites.filter((id) => id !== friendId) }));
+
     const sessionId = get().sessionId;
     if (!sessionId) return;
     const { error } = await supabase.from('session_invites').delete().match({ session_id: sessionId, invitee_id: friendId });
@@ -331,6 +344,11 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   },
 
   acceptInvite: async (invite, userId, username) => {
+    // Optimistic update
+    set((state) => ({
+      pendingInvites: state.pendingInvites.filter((i) => i.id !== invite.id),
+    }));
+
     // Update invite status
     const { error } = await supabase
       .from('session_invites')
@@ -387,10 +405,11 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   },
 
   declineInvite: async (inviteId) => {
-    await supabase.from('session_invites').update({ status: 'declined' }).eq('id', inviteId);
+    // Optimistic update
     set((state) => ({
       pendingInvites: state.pendingInvites.filter((i) => i.id !== inviteId),
     }));
+    await supabase.from('session_invites').update({ status: 'declined' }).eq('id', inviteId);
   },
 
   // ─── Session Channel ────────────────────────────────────────
@@ -535,21 +554,23 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   // ─── Timer Controls (host only, broadcast to all) ───────────
 
   startTimer: () => {
-    const { channel, timeLeft, focusTime, breakTime } = get();
+    const { channel, timeLeft, focusTime, breakTime, mode } = get();
     const targetEndTime = Date.now() + timeLeft * 1000;
+    set({ isRunning: true, targetEndTime });
     channel?.send({
       type: 'broadcast',
       event: 'timer_sync',
-      payload: { timeLeft, mode: get().mode, isRunning: true, targetEndTime, focusTime, breakTime },
+      payload: { timeLeft, mode, isRunning: true, targetEndTime, focusTime, breakTime },
     });
   },
 
   pauseTimer: () => {
-    const { channel, focusTime, breakTime } = get();
+    const { channel, focusTime, breakTime, timeLeft, mode } = get();
+    set({ isRunning: false, targetEndTime: null });
     channel?.send({
       type: 'broadcast',
       event: 'timer_sync',
-      payload: { timeLeft: get().timeLeft, mode: get().mode, isRunning: false, targetEndTime: null, focusTime, breakTime },
+      payload: { timeLeft, mode, isRunning: false, targetEndTime: null, focusTime, breakTime },
     });
   },
 
