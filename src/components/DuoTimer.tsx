@@ -7,6 +7,8 @@ import { TimerRing } from '@/components/TimerRing';
 import { ChatBox } from '@/components/ChatBox';
 import { useDuoStore } from '@/store/duoStore';
 import { useAuthStore } from '@/store/authStore';
+import { useSettingsStore } from '@/store/settingsStore';
+import { ScrollPicker } from './ScrollPicker';
 import { Spacing, Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
@@ -142,7 +144,7 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
           {/* Header */}
           <View style={styles.header}>
             <ThemedText type="title" style={[styles.title, { color: primary }]}>
-              Together Focus
+              PomoDuo
             </ThemedText>
             <Pressable onPress={() => setShowMenu(true)}>
               <ThemedText style={{ color: textColor, fontSize: 24 }}>☰</ThemedText>
@@ -197,30 +199,26 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
                 <View style={styles.timeSettingsRow}>
                   <View style={styles.timeSetting}>
                     <ThemedText style={{ color: secondary, fontSize: 10, fontFamily: Fonts.sansBold }}>FOCUS</ThemedText>
-                    <View style={styles.timeAdjuster}>
-                      <Pressable onPress={() => setFocusTime(Math.max(1, focusTime - 1))}>
-                        <ThemedText style={{ color: textColor, fontSize: 20, paddingHorizontal: 8 }}>-</ThemedText>
-                      </Pressable>
-                      <ThemedText style={{ color: textColor, fontSize: 16, fontFamily: Fonts.sansBold, width: 32, textAlign: 'center' }}>
-                        {focusTime}
-                      </ThemedText>
-                      <Pressable onPress={() => setFocusTime(Math.min(120, focusTime + 1))}>
-                        <ThemedText style={{ color: textColor, fontSize: 20, paddingHorizontal: 8 }}>+</ThemedText>
-                      </Pressable>
+                    <View style={{ width: 120, height: 60, marginTop: 4 }}>
+                      <ScrollPicker
+                        items={Array.from({ length: 60 }, (_, i) => i + 1)}
+                        selectedValue={focusTime}
+                        onValueChange={(val) => setFocusTime(val)}
+                        textColor={textColor}
+                        itemWidth={40}
+                      />
                     </View>
                   </View>
                   <View style={styles.timeSetting}>
                     <ThemedText style={{ color: secondary, fontSize: 10, fontFamily: Fonts.sansBold }}>BREAK</ThemedText>
-                    <View style={styles.timeAdjuster}>
-                      <Pressable onPress={() => setBreakTime(Math.max(1, breakTime - 1))}>
-                        <ThemedText style={{ color: textColor, fontSize: 20, paddingHorizontal: 8 }}>-</ThemedText>
-                      </Pressable>
-                      <ThemedText style={{ color: textColor, fontSize: 16, fontFamily: Fonts.sansBold, width: 32, textAlign: 'center' }}>
-                        {breakTime}
-                      </ThemedText>
-                      <Pressable onPress={() => setBreakTime(Math.min(60, breakTime + 1))}>
-                        <ThemedText style={{ color: textColor, fontSize: 20, paddingHorizontal: 8 }}>+</ThemedText>
-                      </Pressable>
+                    <View style={{ width: 120, height: 60, marginTop: 4 }}>
+                      <ScrollPicker
+                        items={Array.from({ length: 60 }, (_, i) => i + 1)}
+                        selectedValue={breakTime}
+                        onValueChange={(val) => setBreakTime(val)}
+                        textColor={textColor}
+                        itemWidth={40}
+                      />
                     </View>
                   </View>
                 </View>
@@ -378,7 +376,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: Fonts.serifBold,
-    fontSize: 32,
+    fontSize: 48,
     letterSpacing: -0.5,
   },
   participantsBar: {

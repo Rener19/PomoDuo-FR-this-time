@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TimerRing } from '@/components/TimerRing';
+import { ScrollPicker } from '@/components/ScrollPicker';
 import { DuoTimer } from '@/components/DuoTimer';
 import { useTimerStore } from '@/store/timerStore';
 import { useDuoStore } from '@/store/duoStore';
@@ -148,7 +149,7 @@ export default function HomeScreen() {
         </View>
 
         <ThemedText type="title" themeColor="primary" style={styles.title}>
-          Together Focus
+          Pomodoro
         </ThemedText>
 
         <ThemedView style={[styles.timerContainer, { backgroundColor: 'transparent', flex: 2 }]}>
@@ -161,30 +162,26 @@ export default function HomeScreen() {
             <View style={[styles.timeSettingsRow, { marginBottom: 0 }]}>
               <View style={styles.timeSetting}>
                 <ThemedText style={{ color: secondary, fontSize: 12, fontFamily: Fonts.sansBold }}>FOCUS</ThemedText>
-                <View style={styles.timeAdjuster}>
-                  <Pressable onPress={() => setTotalFocusTime(Math.max(1, totalFocusTime - 1))}>
-                    <ThemedText style={{ color: textColor, fontSize: 24, paddingHorizontal: 10 }}>-</ThemedText>
-                  </Pressable>
-                  <ThemedText style={{ color: textColor, fontSize: 18, fontFamily: Fonts.sansBold, width: 40, textAlign: 'center' }}>
-                    {totalFocusTime}
-                  </ThemedText>
-                  <Pressable onPress={() => setTotalFocusTime(Math.min(120, totalFocusTime + 1))}>
-                    <ThemedText style={{ color: textColor, fontSize: 24, paddingHorizontal: 10 }}>+</ThemedText>
-                  </Pressable>
+                <View style={{ width: 120, height: 60, marginTop: 4 }}>
+                  <ScrollPicker
+                    items={Array.from({ length: 60 }, (_, i) => i + 1)}
+                    selectedValue={totalFocusTime}
+                    onValueChange={(val) => setTotalFocusTime(val)}
+                    textColor={textColor}
+                    itemWidth={40}
+                  />
                 </View>
               </View>
               <View style={styles.timeSetting}>
                 <ThemedText style={{ color: secondary, fontSize: 12, fontFamily: Fonts.sansBold }}>BREAK</ThemedText>
-                <View style={styles.timeAdjuster}>
-                  <Pressable onPress={() => setBreakTime(Math.max(1, breakTime - 1))}>
-                    <ThemedText style={{ color: textColor, fontSize: 24, paddingHorizontal: 10 }}>-</ThemedText>
-                  </Pressable>
-                  <ThemedText style={{ color: textColor, fontSize: 18, fontFamily: Fonts.sansBold, width: 40, textAlign: 'center' }}>
-                    {breakTime}
-                  </ThemedText>
-                  <Pressable onPress={() => setBreakTime(Math.min(60, breakTime + 1))}>
-                    <ThemedText style={{ color: textColor, fontSize: 24, paddingHorizontal: 10 }}>+</ThemedText>
-                  </Pressable>
+                <View style={{ width: 120, height: 60, marginTop: 4 }}>
+                  <ScrollPicker
+                    items={Array.from({ length: 60 }, (_, i) => i + 1)}
+                    selectedValue={breakTime}
+                    onValueChange={(val) => setBreakTime(val)}
+                    textColor={textColor}
+                    itemWidth={40}
+                  />
                 </View>
               </View>
             </View>
@@ -291,7 +288,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: Fonts.serifBold,
-    fontSize: 32,
+    fontSize: 48,
     letterSpacing: -0.5,
     marginBottom: Spacing.four,
   },
