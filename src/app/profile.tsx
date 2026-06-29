@@ -99,6 +99,7 @@ export default function ProfileScreen() {
                   if (!newUsername.trim()) return;
                   await supabase.from('profiles').update({ username: newUsername }).eq('id', user?.id);
                   setProfile({ ...profile, username: newUsername });
+                  useAuthStore.getState().updateProfile({ id: user!.id, username: newUsername });
                   setEditingUsername(false);
                 }} style={{ backgroundColor: primary, padding: Spacing.two, borderRadius: Spacing.one }}>
                   <ThemedText style={{ color: '#fff', fontWeight: 'bold' }}>Save</ThemedText>

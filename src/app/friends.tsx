@@ -8,10 +8,11 @@ import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { useDuoStore } from '@/store/duoStore';
+import { useTimerStore } from '@/store/timerStore';
 
 export default function FriendsScreen() {
   const { background, text, primary, secondary, backgroundElement } = useTheme();
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const { pendingInvites, acceptInvite, declineInvite } = useDuoStore();
 
   const [showRequests, setShowRequests] = useState(false);
@@ -123,8 +124,8 @@ export default function FriendsScreen() {
   }
 
   async function handleAcceptSessionInvite(invite: any) {
-    if (!user) return;
-    const username = user.email?.split('@')[0] || 'User';
+    if (!user || !profile) return;
+    const username = profile.username || 'User';
     const success = await acceptInvite(invite, user.id, username);
     if (!success) Alert.alert('Error', 'Could not join session.');
   }

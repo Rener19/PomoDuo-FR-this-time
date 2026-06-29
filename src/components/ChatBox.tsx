@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { StyleSheet, View, TextInput, ScrollView, Pressable, Modal } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { StyleSheet, View, TextInput, ScrollView, Pressable, Modal, Animated, Keyboard, Platform } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useDuoStore, ChatMessage } from '@/store/duoStore';
 import { useAuthStore } from '@/store/authStore';
@@ -10,7 +10,7 @@ export function ChatBox() {
   const [text, setText] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
   const { chatMessages, sendMessage, isChatEnabled, chatOnlyOnBreak, mode, isHost, toggleChat, toggleChatOnBreak } = useDuoStore();
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const { background, backgroundElement, text: textColor, primary, secondary } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
 
@@ -18,16 +18,43 @@ export function ChatBox() {
   const isChatActive = isChatEnabled && (!chatOnlyOnBreak || mode === 'break');
 
   function handleSend() {
-    if (!text.trim() || !user) return;
-    const username = user.email?.split('@')[0] || 'User';
+    if (!text.trim() || !user || !profile) return;
+    const username = profile.username || 'User';
     sendMessage(user.id, username, text.trim());
     setText('');
   }
 
   // Auto-scroll is handled by ScrollView's onContentSizeChange
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      Animated.timing(translateY, {
+        toValue: -e.endCoordinates.height,
+        duration: e.duration || 250,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, (e) => {
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: e.duration || 250,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   return (
-    <View style={[styles.container, { backgroundColor: backgroundElement }]}>
+    <Animated.View style={[styles.container, { backgroundColor: backgroundElement, transform: [{ translateY }] }]}>
       <View style={styles.header}>
         <ThemedText style={{ color: textColor, fontWeight: 'bold' }}>
           💬 Chat
@@ -124,7 +151,7 @@ export function ChatBox() {
           </View>
         </>
       )}
-    </View>
+    </Animated.View>
   );
 }
 

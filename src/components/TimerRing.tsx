@@ -18,6 +18,8 @@ export function TimerRing({ size = 280, strokeWidth = 18 }) {
   const totalFocusTime = isDuo ? duoState.focusTime : soloState.totalFocusTime;
   const breakTime = isDuo ? duoState.breakTime : soloState.breakTime;
   const mode = isDuo ? duoState.mode : soloState.mode;
+  const isRunning = isDuo ? duoState.isRunning : soloState.isRunning;
+  const targetEndTime = isDuo ? duoState.targetEndTime : soloState.targetEndTime;
 
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
@@ -47,6 +49,12 @@ export function TimerRing({ size = 280, strokeWidth = 18 }) {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const getEndTimeText = () => {
+    if (!isRunning || !targetEndTime) return null;
+    const date = new Date(targetEndTime);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   return (
@@ -82,6 +90,11 @@ export function TimerRing({ size = 280, strokeWidth = 18 }) {
         <Text style={[styles.modeText, { color: timerProgressColor }]}>
           {mode === 'focus' ? 'Focus' : 'Break'}
         </Text>
+        {isRunning && targetEndTime && (
+          <Text style={[styles.endTimeText, { color: timerProgressColor, opacity: 0.8 }]}>
+            🔔 Ends at {getEndTimeText()}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -108,5 +121,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: '600',
     letterSpacing: 2,
+  },
+  endTimeText: {
+    fontSize: 14,
+    marginTop: 8,
+    fontWeight: '500',
   },
 });

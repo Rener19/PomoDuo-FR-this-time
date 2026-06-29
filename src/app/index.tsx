@@ -18,7 +18,7 @@ import { safeSetInterval, safeClearInterval } from '@/lib/timerUtils';
 export default function HomeScreen() {
   const { isRunning, start, pause, reset, tick, syncFromBackground, mode, switchMode, totalFocusTime, breakTime, setTotalFocusTime, setBreakTime, timeLeft } = useTimerStore();
   const duo = useDuoStore();
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const { background, text: textColor, primary, secondary, backgroundElement } = useTheme();
 
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -79,8 +79,8 @@ export default function HomeScreen() {
   }
 
   async function handleSendInvites() {
-    if (!user || selectedFriends.length === 0) return;
-    const username = user.email?.split('@')[0] || 'Host';
+    if (!user || !profile || selectedFriends.length === 0) return;
+    const username = profile.username || 'Host';
     const currentTimer = useTimerStore.getState();
     await duo.inviteFriends(
       user.id,
@@ -97,8 +97,8 @@ export default function HomeScreen() {
   }
 
   async function handleAcceptInvite(invite: any) {
-    if (!user) return;
-    const username = user.email?.split('@')[0] || 'User';
+    if (!user || !profile) return;
+    const username = profile.username || 'User';
     const success = await duo.acceptInvite(invite, user.id, username);
     if (!success) Alert.alert('Error', 'Could not join session.');
   }

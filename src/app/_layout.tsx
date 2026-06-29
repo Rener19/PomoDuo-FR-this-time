@@ -1,8 +1,11 @@
+import { LogBox } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useEffect } from 'react';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+
+LogBox.ignoreLogs(['new NativeEventEmitter']);
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';

@@ -3,7 +3,7 @@ import { initNotifications } from './notifications';
 import { useTimerStore } from '@/store/timerStore';
 import { useDuoStore } from '@/store/duoStore';
 import { useAuthStore } from '@/store/authStore';
-import { startForegroundService, updateTimerNotification, stopForegroundService } from '@/services/timerForegroundService';
+import { startForegroundService, updateTimerNotification, stopForegroundService, clearAlarmNotification } from '@/services/timerForegroundService';
 
 export function NotificationManager() {
   const soloTimer = useTimerStore();
@@ -35,13 +35,29 @@ export function NotificationManager() {
       if (isModeChange || isTimeAdjusted || lastTargetEndRef.current === 0) {
         lastTargetEndRef.current = targetEnd;
         lastModeRef.current = activeTimer.mode;
-        startForegroundService(activeTimer.mode, activeTimer.timeLeft);
+        
+        if (isModeChange && lastTargetEndRef.current !== 0) {
+          const ringingMode = activeTimer.mode === 'focus' ? 'break' : 'focus';
+          
+          // Let the alarm ring fully, then clear it from the notification tray after 8 seconds
+          // so it doesn't stack up and mute future alarms!
+          setTimeout(() => {
+            clearAlarmNotification(ringingMode);
+          }, 8000);
+          
+          // Delay updating the service by 2 seconds to allow the alarm sound to play without OS suppression
+          setTimeout(() => {
+            startForegroundService(activeTimer.mode, activeTimer.timeLeft, activeTimer.targetEndTime);
+          }, 2000);
+        } else {
+          startForegroundService(activeTimer.mode, activeTimer.timeLeft, activeTimer.targetEndTime);
+        }
       }
     } else {
       // Stopped or Paused
       if (lastTargetEndRef.current !== 0) {
         lastTargetEndRef.current = 0;
-        updateTimerNotification(activeTimer.mode, activeTimer.timeLeft, false);
+        updateTimerNotification(activeTimer.mode, activeTimer.timeLeft, false, null);
       }
       
       if (activeTimer.timeLeft === (activeTimer.mode === 'focus' ? activeTimer.totalFocusTime * 60 : activeTimer.breakTime * 60)) {

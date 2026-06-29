@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from './authStore';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { AppState } from 'react-native';
-import notifee from 'react-native-notify-kit';
+import notifee, { AndroidImportance } from 'react-native-notify-kit';
 
 export interface ChatMessage {
   id: string;
@@ -27,6 +27,7 @@ export interface SessionInvite {
 interface DuoState {
   // Session
   sessionId: string | null;
+  hostId: string | null;
   isHost: boolean;
   participants: { id: string; username: string }[];
   waitingForFriends: boolean;
@@ -85,12 +86,14 @@ interface DuoState {
   // Local tick
   tick: () => void;
   syncFromBackground: () => void;
+  syncChatMessages: () => Promise<void>;
 }
 
 function setupChannel(channel: RealtimeChannel, set: any, get: any) {
   channel
     .on('broadcast', { event: 'host_changed' }, ({ payload }) => {
       if (payload.newHostId) {
+        set({ hostId: payload.newHostId });
         const currentUser = useAuthStore.getState().user;
         if (currentUser && currentUser.id === payload.newHostId) {
           set({ isHost: true });
@@ -104,15 +107,21 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
         if (state.chatMessages.find((m) => m.id === msg.id)) return state;
         
         if (AppState.currentState === 'background' || AppState.currentState === 'inactive') {
-          notifee.displayNotification({
-            title: msg.username,
-            body: msg.text,
-            android: {
-              channelId: 'pomoduo_timer',
-              smallIcon: 'ic_launcher',
-              pressAction: { id: 'default' },
-            },
-          }).catch(e => console.error('Error showing chat notification:', e));
+          notifee.createChannel({
+            id: 'pomoduo_chat',
+            name: 'Chat Messages',
+            importance: AndroidImportance.DEFAULT,
+          }).then(channelId => {
+            notifee.displayNotification({
+              title: msg.username,
+              body: msg.text,
+              android: {
+                channelId,
+                smallIcon: 'ic_launcher',
+                pressAction: { id: 'default' },
+              },
+            }).catch(e => console.error('Error showing chat notification:', e));
+          });
         }
 
         return { chatMessages: [...state.chatMessages, msg] };
@@ -169,6 +178,7 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
 
 export const useDuoStore = create<DuoState>((set, get) => ({
   sessionId: null,
+  hostId: null,
   isHost: false,
   participants: [],
   waitingForFriends: false,
@@ -336,6 +346,9 @@ export const useDuoStore = create<DuoState>((set, get) => ({
       false,
     );
 
+    // Also update hostId from session
+    set({ hostId: session.host_id });
+
     // Remove from pending
     set((state) => ({
       pendingInvites: state.pendingInvites.filter((i) => i.id !== invite.id),
@@ -427,6 +440,7 @@ export const useDuoStore = create<DuoState>((set, get) => ({
 
     set({
       sessionId,
+      hostId: isHost ? userId : get().hostId,
       isHost: isHost,
       participants,
       focusTime: focusMin,
@@ -481,6 +495,7 @@ export const useDuoStore = create<DuoState>((set, get) => ({
 
     set({
       sessionId: null,
+      hostId: null,
       isHost: false,
       participants: [],
       channel: null,
@@ -698,6 +713,7 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   },
 
   syncFromBackground: () => {
+    get().syncChatMessages();
     set((state) => {
       if (!state.isRunning || !state.targetEndTime) return state;
       const remainingMs = state.targetEndTime - Date.now();
@@ -729,5 +745,26 @@ export const useDuoStore = create<DuoState>((set, get) => ({
       }
       return { timeLeft: Math.ceil(remainingMs / 1000) };
     });
+  },
+
+  syncChatMessages: async () => {
+    const { sessionId } = get();
+    if (!sessionId) return;
+    const { data } = await supabase
+      .from('duo_chat_messages')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('timestamp', { ascending: true });
+    
+    if (data) {
+      const messages = data.map((m: any) => ({
+        id: m.id,
+        userId: m.user_id,
+        username: m.username,
+        text: m.text,
+        timestamp: m.timestamp,
+      }));
+      set({ chatMessages: messages });
+    }
   },
 }));

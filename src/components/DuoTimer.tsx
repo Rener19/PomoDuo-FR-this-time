@@ -19,7 +19,7 @@ interface DuoTimerProps {
 
 export function DuoTimer({ onLeave }: DuoTimerProps) {
   const {
-    sessionId, isHost, participants, isRunning, mode, timeLeft,
+    sessionId, hostId, isHost, participants, isRunning, mode, timeLeft,
     startTimer, pauseTimer, resetTimer, switchMode, leaveSession,
     tick, syncFromBackground, isChatEnabled, chatOnlyOnBreak,
     focusTime, breakTime, setFocusTime, setBreakTime, inviteMoreFriends,
@@ -46,6 +46,13 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
       // Exclude self from toast (when creating session)
       if (newParticipant && newParticipant.id !== user?.id) {
         showToast(`${newParticipant.username} joined the session! 👋`);
+      }
+    }
+    // Check if someone left
+    if (participants.length < prevParticipantsRef.current.length) {
+      const left = prevParticipantsRef.current.find(p => !participants.some(np => np.id === p.id));
+      if (left && left.id !== user?.id) {
+        showToast(`${left.username} left the session.`);
       }
     }
     prevParticipantsRef.current = participants;
@@ -266,7 +273,9 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
                 {participants.map(p => (
                   <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#27AE60' }} />
-                    <ThemedText style={{ color: textColor }}>{p.username}</ThemedText>
+                    <ThemedText style={{ color: textColor }}>
+                      {p.username} {p.id === hostId ? '👑' : ''}
+                    </ThemedText>
                   </View>
                 ))}
               </View>

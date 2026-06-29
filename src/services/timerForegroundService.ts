@@ -1,8 +1,10 @@
-import notifee, { AndroidImportance, TimestampTrigger, TriggerType } from 'react-native-notify-kit';
+import notifee, { AndroidImportance, TimestampTrigger, TriggerType, AndroidVisibility, AndroidCategory } from 'react-native-notify-kit';
 import { useSettingsStore } from '@/store/settingsStore';
 
 let isServiceRunning = false;
-let channelId: string | null = null;
+let serviceChannelId: string | null = null;
+let alarmChannelSoundId: string | null = null;
+let alarmChannelSilentId: string | null = null;
 let stopServiceCallback: ((value?: unknown) => void) | null = null;
 
 const formatEndTime = (timeLeftSeconds: number) => {
@@ -10,42 +12,59 @@ const formatEndTime = (timeLeftSeconds: number) => {
   return endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
-export async function startForegroundService(mode: string, timeLeft: number) {
-  if (isServiceRunning) return;
-  isServiceRunning = true;
-
-  if (!channelId) {
-    channelId = await notifee.createChannel({
-      id: 'pomoduo_timer',
+export async function startForegroundService(mode: string, timeLeft: number, targetEndTime: number | null = null) {
+  if (!serviceChannelId) {
+    serviceChannelId = await notifee.createChannel({
+      id: 'pomoduo_timer_service',
       name: 'Timer Service',
-      importance: AndroidImportance.HIGH,
+      importance: AndroidImportance.LOW, // Low importance for persistent timer (no sound)
     });
   }
 
-  // Register the service and keep the promise pending until we stop it
-  notifee.registerForegroundService((notification) => {
-    return new Promise((resolve) => {
-      stopServiceCallback = resolve;
+  if (!isServiceRunning) {
+    isServiceRunning = true;
+    notifee.registerForegroundService((notification) => {
+      return new Promise((resolve) => {
+        stopServiceCallback = resolve;
+      });
     });
-  });
+  }
 
-  await updateTimerNotification(mode, timeLeft, true);
+  await updateTimerNotification(mode, timeLeft, true, targetEndTime);
 }
 
-export async function updateTimerNotification(mode: string, timeLeft: number, isRunning: boolean) {
-  if (!channelId) {
-    channelId = await notifee.createChannel({
-      id: 'pomoduo_timer',
+export async function updateTimerNotification(mode: string, timeLeft: number, isRunning: boolean, targetEndTime: number | null = null) {
+  if (!serviceChannelId) {
+    serviceChannelId = await notifee.createChannel({
+      id: 'pomoduo_timer_service',
       name: 'Timer Service',
+      importance: AndroidImportance.LOW,
+    });
+  }
+  if (!alarmChannelSoundId) {
+    alarmChannelSoundId = await notifee.createChannel({
+      id: 'pomoduo_alarms_custom_v1',
+      name: 'Timer Alarms (Sound)',
       importance: AndroidImportance.HIGH,
+      sound: 'pomoduo_alarm',
+      visibility: AndroidVisibility.PUBLIC,
+    });
+  }
+  if (!alarmChannelSilentId) {
+    alarmChannelSilentId = await notifee.createChannel({
+      id: 'pomoduo_alarms_silent_v1',
+      name: 'Timer Alarms (Silent)',
+      importance: AndroidImportance.HIGH,
+      visibility: AndroidVisibility.PUBLIC,
     });
   }
 
   const modeStr = mode === 'focus' ? 'Focusing' : 'Break Time';
 
   if (!isRunning) {
-    // Stop the alarm trigger if paused
-    await notifee.cancelNotification('timer-end');
+    // Stop the alarm if paused
+    await notifee.cancelNotification(`timer-end-${mode}`);
+    await notifee.cancelTriggerNotification(`timer-end-${mode}`);
     
     if (isServiceRunning) {
       await notifee.displayNotification({
@@ -53,7 +72,7 @@ export async function updateTimerNotification(mode: string, timeLeft: number, is
         title: `PomoDuo - ${modeStr} (Paused)`,
         body: `Timer paused.`,
         android: {
-          channelId,
+          channelId: serviceChannelId,
           asForegroundService: true,
           ongoing: true,
           smallIcon: 'ic_launcher',
@@ -73,7 +92,7 @@ export async function updateTimerNotification(mode: string, timeLeft: number, is
       title: `PomoDuo - ${modeStr}`,
       body: `Ends at ${endStr}`,
       android: {
-        channelId,
+        channelId: serviceChannelId,
         asForegroundService: true,
         ongoing: true,
         smallIcon: 'ic_launcher',
@@ -82,27 +101,28 @@ export async function updateTimerNotification(mode: string, timeLeft: number, is
     });
   }
 
-  // Schedule Native Trigger Alarm
-  await notifee.cancelNotification('timer-end');
+  // Cancel previous pending trigger for this mode before setting a new one
+  await notifee.cancelTriggerNotification(`timer-end-${mode}`);
   
   const { soundEnabled } = useSettingsStore.getState();
   
   if (timeLeft > 0) {
     const trigger: TimestampTrigger = {
       type: TriggerType.TIMESTAMP,
-      timestamp: Date.now() + (timeLeft * 1000),
+      timestamp: targetEndTime || Date.now() + (timeLeft * 1000),
       alarmManager: true, // Guarantees exact delivery on Android
     };
 
     const notificationPayload = {
-      id: 'timer-end',
+      id: `timer-end-${mode}`,
       title: `Time's up!`,
       body: `Your ${mode} session has ended.`,
       android: {
-        channelId,
+        channelId: soundEnabled ? alarmChannelSoundId : alarmChannelSilentId,
         smallIcon: 'ic_launcher',
         importance: AndroidImportance.HIGH,
-        sound: soundEnabled ? 'default' : undefined,
+        pressAction: { id: 'default' },
+        category: AndroidCategory.ALARM,
       },
     };
 
@@ -117,9 +137,16 @@ export async function updateTimerNotification(mode: string, timeLeft: number, is
   }
 }
 
+export async function clearAlarmNotification(mode: string) {
+  await notifee.cancelNotification(`timer-end-${mode}`);
+}
+
 export async function stopForegroundService() {
   isServiceRunning = false;
-  await notifee.cancelNotification('timer-end');
+  await notifee.cancelNotification('timer-end-focus');
+  await notifee.cancelTriggerNotification('timer-end-focus');
+  await notifee.cancelNotification('timer-end-break');
+  await notifee.cancelTriggerNotification('timer-end-break');
   await notifee.stopForegroundService();
   if (stopServiceCallback) {
     stopServiceCallback();
