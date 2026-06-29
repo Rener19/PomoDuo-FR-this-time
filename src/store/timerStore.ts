@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { supabase } from '@/lib/supabase';
+import { useAuthStore } from './authStore';
 
 type TimerMode = 'focus' | 'break';
 
@@ -69,10 +71,30 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     set((state) => {
       if (!state.isRunning || state.timeLeft <= 0) return state;
       const newTimeLeft = state.timeLeft - 1;
-      
-      // Auto-switch mode when timer hits zero (this will be handled by components listening to timeLeft too)
+      // Auto-switch mode when timer hits zero and auto-start
       if (newTimeLeft <= 0) {
-        return { timeLeft: 0, isRunning: false, targetEndTime: null };
+        // Log focus time if finishing focus mode
+        if (state.mode === 'focus') {
+          const user = useAuthStore.getState().user;
+          if (user) {
+            supabase.rpc('log_focus_time', {
+              user_id: user.id,
+              minutes_added: state.totalFocusTime
+            }).then(({ error }) => {
+              if (error) console.error('Failed to log focus time:', error);
+            });
+          }
+        }
+
+        const nextMode = state.mode === 'focus' ? 'break' : 'focus';
+        const nextTimeLeft = nextMode === 'focus' ? state.totalFocusTime * 60 : state.breakTime * 60;
+        
+        return { 
+          mode: nextMode, 
+          timeLeft: nextTimeLeft, 
+          isRunning: true, 
+          targetEndTime: Date.now() + nextTimeLeft * 1000 
+        };
       }
       
       return { timeLeft: newTimeLeft };
@@ -100,7 +122,27 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       const remainingMs = state.targetEndTime - now;
       
       if (remainingMs <= 0) {
-        return { timeLeft: 0, isRunning: false, targetEndTime: null };
+        // Log focus time if finished in background
+        if (state.mode === 'focus') {
+          const user = useAuthStore.getState().user;
+          if (user) {
+            supabase.rpc('log_focus_time', {
+              user_id: user.id,
+              minutes_added: state.totalFocusTime
+            }).catch(e => console.error(e));
+          }
+        }
+
+        const nextMode = state.mode === 'focus' ? 'break' : 'focus';
+        const nextTimeLeft = nextMode === 'focus' ? state.totalFocusTime * 60 : state.breakTime * 60;
+        // In background, auto-start might drift or be blocked, but we'll try to auto-start anyway
+        // Or actually, it's safer to just start it.
+        return { 
+          mode: nextMode, 
+          timeLeft: nextTimeLeft, 
+          isRunning: true, 
+          targetEndTime: Date.now() + nextTimeLeft * 1000 
+        };
       }
       
       return { timeLeft: Math.ceil(remainingMs / 1000) };

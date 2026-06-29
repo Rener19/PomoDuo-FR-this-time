@@ -9,8 +9,6 @@ import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import { Spacing } from '@/constants/theme';
 
-WebBrowser.maybeCompleteAuthSession();
-
 // This generates the correct redirect URI for whatever environment we're in
 // (Expo Go, dev build, standalone, web)
 const redirectTo = makeRedirectUri();
@@ -50,6 +48,9 @@ export function AuthScreen() {
         options: {
           redirectTo,
           skipBrowserRedirect: true,
+          queryParams: {
+            prompt: 'select_account',
+          },
         },
       });
 

@@ -24,15 +24,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   
   ensureProfile: async (user: User | null) => {
     if (!user) return;
-    const { data } = await supabase.from('profiles').select('id').eq('id', user.id).single();
-    if (!data) {
-      // Create profile using email prefix or random string for username
-      const defaultUsername = user.email ? user.email.split('@')[0] : `user_${Math.floor(Math.random() * 10000)}`;
-      await supabase.from('profiles').insert({
-        id: user.id,
-        username: defaultUsername,
-        avatar_url: user.user_metadata?.avatar_url || null,
-      });
+    try {
+      const { data } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle();
+      if (!data) {
+        // Create profile using email prefix or random string for username
+        const defaultUsername = user.email ? user.email.split('@')[0] : `user_${Math.floor(Math.random() * 10000)}`;
+        const { error } = await supabase.from('profiles').insert({
+          id: user.id,
+          username: defaultUsername,
+          avatar_url: user.user_metadata?.avatar_url || null,
+        });
+        if (error) {
+          // Ignore unique constraint violations caused by concurrent inserts
+          if (error.code !== '23505') {
+            console.error('Error creating profile:', error);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('ensureProfile error:', err);
     }
   },
   

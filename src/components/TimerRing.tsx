@@ -25,7 +25,10 @@ export function TimerRing({ size = 280, strokeWidth = 18 }) {
   const { timerCircle: timerCircleColor, timerProgress: timerProgressColor } = useTheme();
   
   const totalTime = mode === 'focus' ? totalFocusTime * 60 : breakTime * 60;
-  const progress = totalTime > 0 ? timeLeft / totalTime : 0;
+  let progress = totalTime > 0 ? timeLeft / totalTime : 0;
+  if (Number.isNaN(progress) || progress === undefined || progress === null || !Number.isFinite(progress)) {
+    progress = 0;
+  }
   
   const strokeDashoffset = useSharedValue(circumference);
 
