@@ -12,6 +12,8 @@ import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import BackgroundTimer from 'react-native-background-timer';
+import { safeSetInterval, safeClearInterval } from '@/lib/timerUtils';
 
 export default function HomeScreen() {
   const { isRunning, start, pause, reset, tick, syncFromBackground, mode, switchMode, totalFocusTime, breakTime, setTotalFocusTime, setBreakTime, timeLeft } = useTimerStore();
@@ -26,11 +28,11 @@ export default function HomeScreen() {
   // All hooks must run before any conditional returns
   useEffect(() => {
     syncFromBackground();
-    let interval: ReturnType<typeof setInterval>;
+    let interval: any;
     if (isRunning && !duo.sessionId) {
-      interval = setInterval(() => tick(), 1000);
+      interval = safeSetInterval(() => tick(), 1000);
     }
-    return () => clearInterval(interval);
+    return () => safeClearInterval(interval);
   }, [isRunning, duo.sessionId]);
 
   // Handle app background/foreground for solo timer
@@ -336,7 +338,7 @@ const styles = StyleSheet.create({
   },
   bannerContainer: {
     position: 'absolute',
-    top: Spacing.two,
+    bottom: Spacing.four,
     left: Spacing.four,
     right: Spacing.four,
     zIndex: 100,

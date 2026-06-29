@@ -1,5 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import { useColorScheme } from 'react-native';
+import { useSettingsStore } from '@/store/settingsStore';
 import { useEffect } from 'react';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
@@ -9,13 +9,14 @@ import AppTabs from '@/components/app-tabs';
 import { AuthScreen } from '@/components/AuthScreen';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
+import { NotificationManager } from '@/lib/NotificationManager';
 
 // MUST be at the module level so it runs before any component mounts.
 // This completes any pending auth sessions from a previous app launch.
 WebBrowser.maybeCompleteAuthSession();
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const { isDarkMode } = useSettingsStore();
   const { session, initialized, initialize } = useAuthStore();
 
   useEffect(() => {
@@ -37,7 +38,8 @@ export default function TabLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={isDarkMode ? DarkTheme : DefaultTheme}>
+      <NotificationManager />
       <AnimatedSplashOverlay />
       {session ? <AppTabs /> : <AuthScreen />}
     </ThemeProvider>

@@ -1,5 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // TODO: Replace with your actual Supabase URL and Anon Key when ready.
 // You can use a .env file (e.g. process.env.EXPO_PUBLIC_SUPABASE_URL) for security.
@@ -8,11 +9,9 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'YOUR_SUPAB
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    // You can configure secure storage for Expo here later.
-    // Example: using expo-secure-store for persisting the session
-    // storage: ExpoSecureStoreAdapter
+    storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true,
+    detectSessionInUrl: false,
   },
 });

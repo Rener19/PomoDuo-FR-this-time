@@ -11,6 +11,8 @@ interface TimerState {
   mode: TimerMode;
   isRunning: boolean;
   targetEndTime: number | null; // Used for calculating time passed in background
+  savedFocusTimeLeft: number | null;
+  savedBreakTimeLeft: number | null;
   
   // Actions
   setTotalFocusTime: (minutes: number) => void;
@@ -30,18 +32,40 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   mode: 'focus',
   isRunning: false,
   targetEndTime: null,
+  savedFocusTimeLeft: null,
+  savedBreakTimeLeft: null,
 
   setTotalFocusTime: (minutes: number) => {
     set((state) => {
-      const newTimeLeft = state.mode === 'focus' ? minutes * 60 : state.timeLeft;
-      return { totalFocusTime: minutes, timeLeft: newTimeLeft, isRunning: false, targetEndTime: null };
+      const diffMinutes = minutes - state.totalFocusTime;
+      let newTimeLeft = state.timeLeft;
+      let newSavedFocus = state.savedFocusTimeLeft;
+
+      if (state.mode === 'focus') {
+        newTimeLeft = Math.max(0, state.timeLeft + (diffMinutes * 60));
+      } else {
+        if (state.savedFocusTimeLeft !== null) {
+          newSavedFocus = Math.max(0, state.savedFocusTimeLeft + (diffMinutes * 60));
+        }
+      }
+      return { totalFocusTime: minutes, timeLeft: newTimeLeft, savedFocusTimeLeft: newSavedFocus, isRunning: false, targetEndTime: null };
     });
   },
   
   setBreakTime: (minutes: number) => {
     set((state) => {
-      const newTimeLeft = state.mode === 'break' ? minutes * 60 : state.timeLeft;
-      return { breakTime: minutes, timeLeft: newTimeLeft, isRunning: false, targetEndTime: null };
+      const diffMinutes = minutes - state.breakTime;
+      let newTimeLeft = state.timeLeft;
+      let newSavedBreak = state.savedBreakTimeLeft;
+
+      if (state.mode === 'break') {
+        newTimeLeft = Math.max(0, state.timeLeft + (diffMinutes * 60));
+      } else {
+        if (state.savedBreakTimeLeft !== null) {
+          newSavedBreak = Math.max(0, state.savedBreakTimeLeft + (diffMinutes * 60));
+        }
+      }
+      return { breakTime: minutes, timeLeft: newTimeLeft, savedBreakTimeLeft: newSavedBreak, isRunning: false, targetEndTime: null };
     });
   },
 
@@ -64,13 +88,17 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       isRunning: false,
       targetEndTime: null,
       timeLeft: state.mode === 'focus' ? state.totalFocusTime * 60 : state.breakTime * 60,
+      savedFocusTimeLeft: null,
+      savedBreakTimeLeft: null,
     }));
   },
 
   tick: () => {
     set((state) => {
-      if (!state.isRunning || state.timeLeft <= 0) return state;
-      const newTimeLeft = state.timeLeft - 1;
+      if (!state.isRunning || !state.targetEndTime || state.timeLeft <= 0) return state;
+      const remainingMs = state.targetEndTime - Date.now();
+      const newTimeLeft = Math.max(0, Math.ceil(remainingMs / 1000));
+
       // Auto-switch mode when timer hits zero and auto-start
       if (newTimeLeft <= 0) {
         // Log focus time if finishing focus mode
@@ -93,7 +121,9 @@ export const useTimerStore = create<TimerState>((set, get) => ({
           mode: nextMode, 
           timeLeft: nextTimeLeft, 
           isRunning: true, 
-          targetEndTime: Date.now() + nextTimeLeft * 1000 
+          targetEndTime: Date.now() + nextTimeLeft * 1000,
+          savedFocusTimeLeft: nextMode === 'focus' ? null : state.savedFocusTimeLeft,
+          savedBreakTimeLeft: nextMode === 'break' ? null : state.savedBreakTimeLeft,
         };
       }
       
@@ -104,10 +134,19 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   switchMode: () => {
     set((state) => {
       const newMode = state.mode === 'focus' ? 'break' : 'focus';
-      const newTimeLeft = newMode === 'focus' ? state.totalFocusTime * 60 : state.breakTime * 60;
+      const savedFocus = state.mode === 'focus' ? state.timeLeft : state.savedFocusTimeLeft;
+      const savedBreak = state.mode === 'break' ? state.timeLeft : state.savedBreakTimeLeft;
+      
+      let restoredTime = newMode === 'focus' ? savedFocus : savedBreak;
+      if (restoredTime === null) {
+        restoredTime = newMode === 'focus' ? state.totalFocusTime * 60 : state.breakTime * 60;
+      }
+
       return {
         mode: newMode,
-        timeLeft: newTimeLeft,
+        timeLeft: restoredTime,
+        savedFocusTimeLeft: savedFocus,
+        savedBreakTimeLeft: savedBreak,
         isRunning: false,
         targetEndTime: null,
       };
@@ -141,7 +180,9 @@ export const useTimerStore = create<TimerState>((set, get) => ({
           mode: nextMode, 
           timeLeft: nextTimeLeft, 
           isRunning: true, 
-          targetEndTime: Date.now() + nextTimeLeft * 1000 
+          targetEndTime: Date.now() + nextTimeLeft * 1000,
+          savedFocusTimeLeft: nextMode === 'focus' ? null : state.savedFocusTimeLeft,
+          savedBreakTimeLeft: nextMode === 'break' ? null : state.savedBreakTimeLeft,
         };
       }
       

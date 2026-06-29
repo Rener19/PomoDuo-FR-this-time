@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from './authStore';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { AppState } from 'react-native';
+import notifee from 'react-native-notify-kit';
 
 export interface ChatMessage {
   id: string;
@@ -39,6 +41,8 @@ interface DuoState {
   mode: 'focus' | 'break';
   isRunning: boolean;
   targetEndTime: number | null;
+  savedFocusTimeLeft: number | null;
+  savedBreakTimeLeft: number | null;
 
   // Chat
   chatMessages: ChatMessage[];
@@ -85,20 +89,6 @@ interface DuoState {
 
 function setupChannel(channel: RealtimeChannel, set: any, get: any) {
   channel
-    .on('broadcast', { event: 'timer_sync' }, ({ payload }) => {
-      // Always calculate timeLeft from targetEndTime to avoid drift
-      let timeLeft = payload.timeLeft;
-      if (payload.isRunning && payload.targetEndTime) {
-        const remainingMs = payload.targetEndTime - Date.now();
-        timeLeft = Math.max(0, Math.ceil(remainingMs / 1000));
-      }
-      set({
-        timeLeft,
-        mode: payload.mode,
-        isRunning: payload.isRunning,
-        targetEndTime: payload.targetEndTime,
-      });
-    })
     .on('broadcast', { event: 'host_changed' }, ({ payload }) => {
       if (payload.newHostId) {
         const currentUser = useAuthStore.getState().user;
@@ -112,6 +102,19 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
       // Deduplicate: skip if we already added this message optimistically
       set((state: DuoState) => {
         if (state.chatMessages.find((m) => m.id === msg.id)) return state;
+        
+        if (AppState.currentState === 'background' || AppState.currentState === 'inactive') {
+          notifee.displayNotification({
+            title: msg.username,
+            body: msg.text,
+            android: {
+              channelId: 'pomoduo_timer',
+              smallIcon: 'ic_launcher',
+              pressAction: { id: 'default' },
+            },
+          }).catch(e => console.error('Error showing chat notification:', e));
+        }
+
         return { chatMessages: [...state.chatMessages, msg] };
       });
     })
@@ -125,7 +128,8 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
             timeLeft: state.timeLeft,
             mode: state.mode,
             isRunning: state.isRunning,
-            targetEndTime: state.targetEndTime,
+            focusTime: state.focusTime,
+            breakTime: state.breakTime,
           },
         });
       }
@@ -139,13 +143,28 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
         participants: state.participants.filter((p: any) => p.id !== payload.id),
       }));
     })
+    .on('broadcast', { event: 'timer_sync' }, ({ payload }) => {
+      // Use payload.timeLeft to calculate our local targetEndTime to avoid device clock drift
+      let timeLeft = payload.timeLeft;
+      let localTargetEndTime = null;
+      if (payload.isRunning) {
+        localTargetEndTime = Date.now() + timeLeft * 1000;
+      }
+      set({
+        timeLeft,
+        mode: payload.mode,
+        isRunning: payload.isRunning,
+        targetEndTime: localTargetEndTime,
+        ...(payload.focusTime !== undefined && { focusTime: payload.focusTime }),
+        ...(payload.breakTime !== undefined && { breakTime: payload.breakTime }),
+      });
+    })
     .on('broadcast', { event: 'chat_settings' }, ({ payload }) => {
       set({
         isChatEnabled: payload.isChatEnabled,
         chatOnlyOnBreak: payload.chatOnlyOnBreak,
       });
-    })
-    .subscribe();
+    });
 }
 
 export const useDuoStore = create<DuoState>((set, get) => ({
@@ -159,6 +178,8 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   mode: 'focus',
   isRunning: false,
   targetEndTime: null,
+  savedFocusTimeLeft: null,
+  savedBreakTimeLeft: null,
   chatMessages: [],
   isChatEnabled: true,
   chatOnlyOnBreak: false,
@@ -254,7 +275,7 @@ export const useDuoStore = create<DuoState>((set, get) => ({
     // 4. Join the Realtime channel and wait
     const initialTimeLeft = timeLeft !== undefined ? timeLeft : focusMin * 60;
     get().joinSessionChannel(session.id, hostId, hostUsername, focusMin, breakMin, true, false, true, mode, initialTimeLeft, isRunning);
-    set({ waitingForFriends: true });
+    // waitingForFriends is now handled correctly by the SUBSCRIBED callback
   },
 
   inviteMoreFriends: async (hostId, friendIds) => {
@@ -308,8 +329,8 @@ export const useDuoStore = create<DuoState>((set, get) => ({
       invite.session_id,
       userId,
       username,
-      session.focus_time_minutes,
-      session.break_time_minutes,
+      session.focus_time_minutes || 25,
+      session.break_time_minutes || 5,
       session.is_chat_enabled ?? true,
       session.chat_only_on_break ?? false,
       false,
@@ -347,8 +368,9 @@ export const useDuoStore = create<DuoState>((set, get) => ({
     // Load existing participants from the database so we see everyone
     const { data: existingParticipants } = await supabase
       .from('session_participants')
-      .select('user_id, profile:profiles!session_participants_user_id_fkey(id, username)')
-      .eq('session_id', sessionId);
+      .select('user_id, joined_at, profile:profiles!session_participants_user_id_fkey(id, username)')
+      .eq('session_id', sessionId)
+      .order('joined_at', { ascending: true });
 
     const participants: { id: string; username: string }[] = [];
     if (existingParticipants) {
@@ -365,14 +387,43 @@ export const useDuoStore = create<DuoState>((set, get) => ({
 
     setupChannel(channel, set, get);
 
-    // Announce join so other clients add us to their list
-    setTimeout(() => {
-      channel.send({
-        type: 'broadcast',
-        event: 'participant_joined',
-        payload: { id: userId, username },
-      });
-    }, 500);
+    // Ensure the host doesn't get stuck waiting for its own broadcast
+    if (isHost) {
+      set({ waitingForFriends: true });
+    }
+
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        channel.send({
+          type: 'broadcast',
+          event: 'participant_joined',
+          payload: { id: userId, username },
+        });
+        
+        // If we are the host, immediately consider ourselves joined so we don't get stuck
+        if (isHost) {
+          set({ waitingForFriends: false });
+        }
+      }
+    });
+
+    // Fetch existing chat messages for this session
+    const { data: messages } = await supabase
+      .from('duo_chat_messages')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('timestamp', { ascending: true });
+
+    let initialMessages: ChatMessage[] = [];
+    if (messages) {
+      initialMessages = messages.map((m: any) => ({
+        id: m.id,
+        userId: m.user_id,
+        username: m.username,
+        text: m.text,
+        timestamp: m.timestamp,
+      }));
+    }
 
     set({
       sessionId,
@@ -387,6 +438,7 @@ export const useDuoStore = create<DuoState>((set, get) => ({
       isChatEnabled: chatEnabled ?? true,
       chatOnlyOnBreak: chatOnBreak ?? false,
       channel,
+      chatMessages: initialMessages,
       sessionStartTime: Date.now(),
       completedFocusMinutes: 0,
       completedBreakMinutes: 0,
@@ -435,6 +487,8 @@ export const useDuoStore = create<DuoState>((set, get) => ({
       chatMessages: [],
       isRunning: false,
       targetEndTime: null,
+      savedFocusTimeLeft: null,
+      savedBreakTimeLeft: null,
       timeLeft: 25 * 60,
       mode: 'focus',
       waitingForFriends: false,
@@ -444,76 +498,115 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   // ─── Timer Controls (host only, broadcast to all) ───────────
 
   startTimer: () => {
-    const { channel, timeLeft } = get();
+    const { channel, timeLeft, focusTime, breakTime } = get();
     const targetEndTime = Date.now() + timeLeft * 1000;
     channel?.send({
       type: 'broadcast',
       event: 'timer_sync',
-      payload: { timeLeft, mode: get().mode, isRunning: true, targetEndTime },
+      payload: { timeLeft, mode: get().mode, isRunning: true, targetEndTime, focusTime, breakTime },
     });
   },
 
   pauseTimer: () => {
-    const { channel } = get();
+    const { channel, focusTime, breakTime } = get();
     channel?.send({
       type: 'broadcast',
       event: 'timer_sync',
-      payload: { timeLeft: get().timeLeft, mode: get().mode, isRunning: false, targetEndTime: null },
+      payload: { timeLeft: get().timeLeft, mode: get().mode, isRunning: false, targetEndTime: null, focusTime, breakTime },
     });
   },
 
   resetTimer: () => {
     const { channel, mode, focusTime, breakTime } = get();
     const newTimeLeft = mode === 'focus' ? focusTime * 60 : breakTime * 60;
+    set({ timeLeft: newTimeLeft, savedFocusTimeLeft: null, savedBreakTimeLeft: null, isRunning: false, targetEndTime: null });
     channel?.send({
       type: 'broadcast',
       event: 'timer_sync',
-      payload: { timeLeft: newTimeLeft, mode, isRunning: false, targetEndTime: null },
+      payload: { timeLeft: newTimeLeft, mode, isRunning: false, targetEndTime: null, focusTime, breakTime },
     });
   },
 
   switchMode: () => {
-    const { mode, focusTime, breakTime, channel } = get();
+    const { mode, timeLeft, focusTime, breakTime, savedFocusTimeLeft, savedBreakTimeLeft, channel } = get();
     const newMode = mode === 'focus' ? 'break' : 'focus';
-    const newTimeLeft = newMode === 'focus' ? focusTime * 60 : breakTime * 60;
-    set({ mode: newMode, timeLeft: newTimeLeft, isRunning: false, targetEndTime: null });
+    
+    const savedFocus = mode === 'focus' ? timeLeft : savedFocusTimeLeft;
+    const savedBreak = mode === 'break' ? timeLeft : savedBreakTimeLeft;
+    
+    let restoredTime = newMode === 'focus' ? savedFocus : savedBreak;
+    if (restoredTime === null) {
+      restoredTime = newMode === 'focus' ? focusTime * 60 : breakTime * 60;
+    }
+
+    set({ 
+      mode: newMode, 
+      timeLeft: restoredTime, 
+      savedFocusTimeLeft: savedFocus, 
+      savedBreakTimeLeft: savedBreak, 
+      isRunning: false, 
+      targetEndTime: null 
+    });
+    
     channel?.send({
       type: 'broadcast',
       event: 'timer_sync',
-      payload: { timeLeft: newTimeLeft, mode: newMode, isRunning: false, targetEndTime: null },
+      payload: { timeLeft: restoredTime, mode: newMode, isRunning: false, targetEndTime: null, focusTime, breakTime },
     });
   },
 
   setFocusTime: (minutes) => {
-    const { mode, timeLeft, channel } = get();
-    const newTimeLeft = mode === 'focus' ? minutes * 60 : timeLeft;
-    set({ focusTime: minutes, timeLeft: newTimeLeft, isRunning: false, targetEndTime: null });
+    const { mode, focusTime, timeLeft, savedFocusTimeLeft, channel } = get();
+    const diffMinutes = minutes - focusTime;
+    let newTimeLeft = timeLeft;
+    let newSavedFocus = savedFocusTimeLeft;
+
+    if (mode === 'focus') {
+      newTimeLeft = Math.max(0, timeLeft + (diffMinutes * 60));
+    } else {
+      if (savedFocusTimeLeft !== null) {
+        newSavedFocus = Math.max(0, savedFocusTimeLeft + (diffMinutes * 60));
+      }
+    }
+    
+    set({ focusTime: minutes, timeLeft: newTimeLeft, savedFocusTimeLeft: newSavedFocus, isRunning: false, targetEndTime: null });
     if (mode === 'focus') {
       channel?.send({
         type: 'broadcast',
         event: 'timer_sync',
-        payload: { timeLeft: newTimeLeft, mode, isRunning: false, targetEndTime: null },
+        payload: { timeLeft: newTimeLeft, mode, isRunning: false, targetEndTime: null, focusTime: minutes, breakTime: get().breakTime },
       });
     }
   },
 
   setBreakTime: (minutes) => {
-    const { mode, timeLeft, channel } = get();
-    const newTimeLeft = mode === 'break' ? minutes * 60 : timeLeft;
-    set({ breakTime: minutes, timeLeft: newTimeLeft, isRunning: false, targetEndTime: null });
+    const { mode, breakTime, timeLeft, savedBreakTimeLeft, channel } = get();
+    const diffMinutes = minutes - breakTime;
+    let newTimeLeft = timeLeft;
+    let newSavedBreak = savedBreakTimeLeft;
+
+    if (mode === 'break') {
+      newTimeLeft = Math.max(0, timeLeft + (diffMinutes * 60));
+    } else {
+      if (savedBreakTimeLeft !== null) {
+        newSavedBreak = Math.max(0, savedBreakTimeLeft + (diffMinutes * 60));
+      }
+    }
+    
+    set({ breakTime: minutes, timeLeft: newTimeLeft, savedBreakTimeLeft: newSavedBreak, isRunning: false, targetEndTime: null });
     if (mode === 'break') {
       channel?.send({
         type: 'broadcast',
         event: 'timer_sync',
-        payload: { timeLeft: newTimeLeft, mode, isRunning: false, targetEndTime: null },
+        payload: { timeLeft: newTimeLeft, mode, isRunning: false, targetEndTime: null, focusTime: get().focusTime, breakTime: minutes },
       });
     }
   },
 
   // ─── Chat ───────────────────────────────────────────────────
 
-  sendMessage: (userId, username, text) => {
-    const { channel } = get();
+  sendMessage: async (userId, username, text) => {
+    const { channel, sessionId } = get();
     const message: ChatMessage = {
       id: `${userId}-${Date.now()}`,
       userId,
@@ -525,12 +618,23 @@ export const useDuoStore = create<DuoState>((set, get) => ({
     set((state) => ({
       chatMessages: [...state.chatMessages, message],
     }));
-    // Broadcast to other participants
+    // Broadcast to other participants for instant UI update
     channel?.send({
       type: 'broadcast',
       event: 'chat_message',
       payload: message,
     });
+    // Persist to database so offline/background users can sync it when they return
+    if (sessionId) {
+      await supabase.from('duo_chat_messages').insert({
+        id: message.id,
+        session_id: sessionId,
+        user_id: userId,
+        username,
+        text,
+        timestamp: message.timestamp,
+      });
+    }
   },
 
   toggleChat: (enabled) => {
@@ -557,8 +661,9 @@ export const useDuoStore = create<DuoState>((set, get) => ({
 
   tick: () => {
     set((state) => {
-      if (!state.isRunning || state.timeLeft <= 0) return state;
-      const newTimeLeft = state.timeLeft - 1;
+      if (!state.isRunning || !state.targetEndTime || state.timeLeft <= 0) return state;
+      const remainingMs = state.targetEndTime - Date.now();
+      const newTimeLeft = Math.max(0, Math.ceil(remainingMs / 1000));
       
       if (newTimeLeft <= 0) {
         // Log focus time if finishing focus mode
@@ -582,6 +687,8 @@ export const useDuoStore = create<DuoState>((set, get) => ({
           timeLeft: nextTimeLeft, 
           isRunning: true, 
           targetEndTime: Date.now() + nextTimeLeft * 1000,
+          savedFocusTimeLeft: nextMode === 'focus' ? null : state.savedFocusTimeLeft,
+          savedBreakTimeLeft: nextMode === 'break' ? null : state.savedBreakTimeLeft,
           completedFocusMinutes: state.mode === 'focus' ? state.completedFocusMinutes + state.focusTime : state.completedFocusMinutes,
           completedBreakMinutes: state.mode === 'break' ? state.completedBreakMinutes + state.breakTime : state.completedBreakMinutes,
         };
@@ -614,6 +721,8 @@ export const useDuoStore = create<DuoState>((set, get) => ({
           timeLeft: nextTimeLeft, 
           isRunning: true, 
           targetEndTime: Date.now() + nextTimeLeft * 1000,
+          savedFocusTimeLeft: nextMode === 'focus' ? null : state.savedFocusTimeLeft,
+          savedBreakTimeLeft: nextMode === 'break' ? null : state.savedBreakTimeLeft,
           completedFocusMinutes: state.mode === 'focus' ? state.completedFocusMinutes + state.focusTime : state.completedFocusMinutes,
           completedBreakMinutes: state.mode === 'break' ? state.completedBreakMinutes + state.breakTime : state.completedBreakMinutes,
         };

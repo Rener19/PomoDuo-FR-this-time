@@ -17,6 +17,9 @@ export default function AppTabs() {
         tabBarStyle: {
           backgroundColor: colors.backgroundElement,
           borderTopColor: colors.backgroundElement,
+          height: 65,
+          paddingBottom: 10,
+          paddingTop: 5,
         },
       }}>
       <Tabs.Screen

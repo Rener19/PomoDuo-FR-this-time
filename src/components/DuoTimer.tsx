@@ -10,6 +10,8 @@ import { useAuthStore } from '@/store/authStore';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
+import BackgroundTimer from 'react-native-background-timer';
+import { safeSetInterval, safeClearInterval } from '@/lib/timerUtils';
 
 interface DuoTimerProps {
   onLeave: () => void;
@@ -96,11 +98,11 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
 
   useEffect(() => {
     syncFromBackground();
-    let interval: ReturnType<typeof setInterval>;
+    let interval: any;
     if (isRunning) {
-      interval = setInterval(() => tick(), 1000);
+      interval = safeSetInterval(() => tick(), 1000);
     }
-    return () => clearInterval(interval);
+    return () => safeClearInterval(interval);
   }, [isRunning]);
 
   useEffect(() => {

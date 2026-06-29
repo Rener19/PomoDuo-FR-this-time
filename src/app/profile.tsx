@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Pressable, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Pressable, ScrollView, Alert, ActivityIndicator, Switch, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuthStore } from '@/store/authStore';
+import { useSettingsStore } from '@/store/settingsStore';
 import { supabase } from '@/lib/supabase';
 
 export default function ProfileScreen() {
   const { background, text, primary, secondary, backgroundElement } = useTheme();
   const { user, signOut } = useAuthStore();
+  const { isDarkMode, toggleDarkMode, soundEnabled, toggleSound } = useSettingsStore();
   
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -31,6 +35,7 @@ export default function ProfileScreen() {
         
       if (error) throw error;
       setProfile(data);
+      setNewUsername(data.username);
     } catch (error) {
       console.error('Error loading profile:', error);
     } finally {
@@ -79,12 +84,55 @@ export default function ProfileScreen() {
                 {profile?.username?.charAt(0).toUpperCase() || '?'}
               </ThemedText>
             </View>
-            <ThemedText style={{ color: text, fontSize: 24, fontWeight: 'bold', marginTop: Spacing.three }}>
-              {profile?.username || 'User'}
-            </ThemedText>
-            <ThemedText style={{ color: secondary, fontSize: 14 }}>
+            
+            {editingUsername ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: Spacing.three, gap: Spacing.two }}>
+                <TextInput
+                  style={[styles.input, { color: text, borderColor: secondary }]}
+                  value={newUsername}
+                  onChangeText={setNewUsername}
+                  placeholder="New username"
+                  placeholderTextColor={secondary}
+                  autoCapitalize="none"
+                />
+                <Pressable onPress={async () => {
+                  if (!newUsername.trim()) return;
+                  await supabase.from('profiles').update({ username: newUsername }).eq('id', user?.id);
+                  setProfile({ ...profile, username: newUsername });
+                  setEditingUsername(false);
+                }} style={{ backgroundColor: primary, padding: Spacing.two, borderRadius: Spacing.one }}>
+                  <ThemedText style={{ color: '#fff', fontWeight: 'bold' }}>Save</ThemedText>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: Spacing.three, gap: Spacing.two }}>
+                <ThemedText style={{ color: text, fontSize: 24, fontWeight: 'bold' }}>
+                  {profile?.username || 'User'}
+                </ThemedText>
+                <Pressable onPress={() => setEditingUsername(true)}>
+                  <ThemedText style={{ color: primary, fontSize: 16 }}>✎</ThemedText>
+                </Pressable>
+              </View>
+            )}
+
+            <ThemedText style={{ color: secondary, fontSize: 14, marginTop: Spacing.one }}>
               {user?.email}
             </ThemedText>
+          </View>
+          
+          {/* Settings */}
+          <ThemedText style={{ color: text, fontWeight: 'bold', fontSize: 18, marginTop: Spacing.four, marginBottom: Spacing.two }}>
+            Settings
+          </ThemedText>
+          <View style={[styles.card, { backgroundColor: backgroundElement, paddingVertical: Spacing.two }]}>
+            <View style={styles.settingRow}>
+              <ThemedText style={{ color: text, fontSize: 16 }}>Dark Mode</ThemedText>
+              <Switch value={isDarkMode} onValueChange={toggleDarkMode} trackColor={{ true: primary }} />
+            </View>
+            <View style={[styles.settingRow, { marginTop: Spacing.three }]}>
+              <ThemedText style={{ color: text, fontSize: 16 }}>Timer End Alarms</ThemedText>
+              <Switch value={soundEnabled} onValueChange={toggleSound} trackColor={{ true: primary }} />
+            </View>
           </View>
 
           {/* Stats */}
@@ -168,5 +216,18 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three,
     borderRadius: Spacing.three,
     alignItems: 'center',
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: Spacing.one,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+    minWidth: 150,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
   },
 });
