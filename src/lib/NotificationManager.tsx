@@ -3,12 +3,14 @@ import { initNotifications } from './notifications';
 import { useTimerStore } from '@/store/timerStore';
 import { useDuoStore } from '@/store/duoStore';
 import { useAuthStore } from '@/store/authStore';
+import { useSettingsStore } from '@/store/settingsStore';
 import { startForegroundService, updateTimerNotification, stopForegroundService, clearAlarmNotification } from '@/services/timerForegroundService';
 
 export function NotificationManager() {
   const soloTimer = useTimerStore();
   const duoTimer = useDuoStore();
   const { user } = useAuthStore();
+  const { soundEnabled } = useSettingsStore();
 
   useEffect(() => {
     initNotifications();
@@ -22,6 +24,7 @@ export function NotificationManager() {
 
   const lastTargetEndRef = useRef(0);
   const lastModeRef = useRef('');
+  const lastSoundEnabledRef = useRef(soundEnabled);
 
   // Start foreground service when timer is running, stop when paused
   useEffect(() => {
@@ -30,11 +33,13 @@ export function NotificationManager() {
     if (activeTimer.isRunning) {
       const targetEnd = Date.now() + (activeTimer.timeLeft * 1000);
       const isModeChange = lastModeRef.current !== activeTimer.mode;
+      const isSoundChange = lastSoundEnabledRef.current !== soundEnabled;
       const isTimeAdjusted = Math.abs(targetEnd - lastTargetEndRef.current) > 2000; // changed by more than 2s
 
-      if (isModeChange || isTimeAdjusted || lastTargetEndRef.current === 0) {
+      if (isModeChange || isTimeAdjusted || isSoundChange || lastTargetEndRef.current === 0) {
         lastTargetEndRef.current = targetEnd;
         lastModeRef.current = activeTimer.mode;
+        lastSoundEnabledRef.current = soundEnabled;
         
         if (isModeChange && lastTargetEndRef.current !== 0) {
           const ringingMode = activeTimer.mode === 'focus' ? 'break' : 'focus';
@@ -67,7 +72,8 @@ export function NotificationManager() {
     }
   }, [
     soloTimer.isRunning, soloTimer.timeLeft, soloTimer.mode, soloTimer.totalFocusTime, soloTimer.breakTime,
-    duoTimer.sessionId, duoTimer.isRunning, duoTimer.timeLeft, duoTimer.mode, duoTimer.focusTime, duoTimer.breakTime
+    duoTimer.sessionId, duoTimer.isRunning, duoTimer.timeLeft, duoTimer.mode, duoTimer.focusTime, duoTimer.breakTime,
+    soundEnabled
   ]);
 
   return null;

@@ -3,14 +3,15 @@ import { StyleSheet, View, Pressable, ScrollView, Alert, ActivityIndicator, Swit
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Spacing, Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuthStore } from '@/store/authStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { supabase } from '@/lib/supabase';
 
 export default function ProfileScreen() {
-  const { background, text, primary, secondary, backgroundElement } = useTheme();
+  const theme = useTheme();
+  const { background, text, primary, secondary, backgroundElement, destructive } = theme;
   const { user, signOut } = useAuthStore();
   const { isDarkMode, toggleDarkMode, soundEnabled, toggleSound } = useSettingsStore();
   
@@ -71,16 +72,17 @@ export default function ProfileScreen() {
   return (
     <ThemedView style={[styles.container, { backgroundColor: background }]}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.responsiveWrapper}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           
-          <ThemedText type="title" style={{ color: text, marginBottom: Spacing.four }}>
+          <ThemedText type="title" style={{ color: primary, marginBottom: Spacing.four, textAlign: 'center' }}>
             Profile
           </ThemedText>
 
           {/* Avatar & Username */}
           <View style={[styles.card, { backgroundColor: backgroundElement }]}>
             <View style={[styles.avatarPlaceholder, { backgroundColor: primary }]}>
-              <ThemedText style={{ color: '#fff', fontSize: 32, fontWeight: 'bold' }}>
+              <ThemedText style={{ color: '#fff', fontSize: 32, fontFamily: Fonts.sansBold }}>
                 {profile?.username?.charAt(0).toUpperCase() || '?'}
               </ThemedText>
             </View>
@@ -102,12 +104,12 @@ export default function ProfileScreen() {
                   useAuthStore.getState().updateProfile({ id: user!.id, username: newUsername });
                   setEditingUsername(false);
                 }} style={{ backgroundColor: primary, padding: Spacing.two, borderRadius: Spacing.one }}>
-                  <ThemedText style={{ color: '#fff', fontWeight: 'bold' }}>Save</ThemedText>
+                  <ThemedText style={{ color: '#fff', fontFamily: Fonts.sansBold }}>Save</ThemedText>
                 </Pressable>
               </View>
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: Spacing.three, gap: Spacing.two }}>
-                <ThemedText style={{ color: text, fontSize: 24, fontWeight: 'bold' }}>
+                <ThemedText style={{ color: text, fontSize: 24, fontFamily: Fonts.sansBold }}>
                   {profile?.username || 'User'}
                 </ThemedText>
                 <Pressable onPress={() => setEditingUsername(true)}>
@@ -122,7 +124,7 @@ export default function ProfileScreen() {
           </View>
           
           {/* Settings */}
-          <ThemedText style={{ color: text, fontWeight: 'bold', fontSize: 18, marginTop: Spacing.four, marginBottom: Spacing.two }}>
+          <ThemedText style={{ color: text, fontFamily: Fonts.sansBold, fontSize: 18, marginTop: Spacing.four, marginBottom: Spacing.two }}>
             Settings
           </ThemedText>
           <View style={[styles.card, { backgroundColor: backgroundElement, paddingVertical: Spacing.two }]}>
@@ -137,13 +139,13 @@ export default function ProfileScreen() {
           </View>
 
           {/* Stats */}
-          <ThemedText style={{ color: text, fontWeight: 'bold', fontSize: 18, marginTop: Spacing.four, marginBottom: Spacing.two }}>
+          <ThemedText style={{ color: text, fontFamily: Fonts.sansBold, fontSize: 18, marginTop: Spacing.four, marginBottom: Spacing.two }}>
             Your Stats
           </ThemedText>
           
           <View style={styles.statsRow}>
             <View style={[styles.statCard, { backgroundColor: backgroundElement }]}>
-              <ThemedText style={{ color: primary, fontSize: 24, fontWeight: 'bold' }}>
+              <ThemedText style={{ color: primary, fontSize: 24, fontFamily: Fonts.sansBold }}>
                 {hoursFocused}h
               </ThemedText>
               <ThemedText style={{ color: secondary, fontSize: 12, marginTop: Spacing.one }}>
@@ -152,7 +154,7 @@ export default function ProfileScreen() {
             </View>
             
             <View style={[styles.statCard, { backgroundColor: backgroundElement }]}>
-              <ThemedText style={{ color: primary, fontSize: 24, fontWeight: 'bold' }}>
+              <ThemedText style={{ color: primary, fontSize: 24, fontFamily: Fonts.sansBold }}>
                 {profile?.current_streak_days || 0}
               </ThemedText>
               <ThemedText style={{ color: secondary, fontSize: 12, marginTop: Spacing.one }}>
@@ -164,16 +166,17 @@ export default function ProfileScreen() {
           {/* Actions */}
           <View style={{ marginTop: Spacing.six }}>
             <Pressable 
-              style={[styles.btn, { backgroundColor: backgroundElement, borderColor: '#E74C3C', borderWidth: 1 }]} 
+              style={[styles.btn, { backgroundColor: backgroundElement, borderColor: destructive, borderWidth: 1 }]} 
               onPress={handleSignOut}
             >
-              <ThemedText style={{ color: '#E74C3C', fontWeight: 'bold', fontSize: 16 }}>
+              <ThemedText style={{ color: destructive, fontFamily: Fonts.sansBold, fontSize: 16 }}>
                 Sign Out
               </ThemedText>
             </Pressable>
           </View>
 
         </ScrollView>
+        </View>
       </SafeAreaView>
     </ThemedView>
   );
@@ -185,6 +188,12 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+    alignItems: 'center',
+  },
+  responsiveWrapper: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 600,
   },
   scrollContent: {
     padding: Spacing.four,

@@ -3,7 +3,7 @@ import { StyleSheet, View, TextInput, Pressable, Alert, ScrollView } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Spacing, Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
@@ -11,7 +11,8 @@ import { useDuoStore } from '@/store/duoStore';
 import { useTimerStore } from '@/store/timerStore';
 
 export default function FriendsScreen() {
-  const { background, text, primary, secondary, backgroundElement } = useTheme();
+  const theme = useTheme();
+  const { background, text, primary, secondary, backgroundElement, success, destructive } = theme;
   const { user, profile } = useAuthStore();
   const { pendingInvites, acceptInvite, declineInvite } = useDuoStore();
 
@@ -135,10 +136,11 @@ export default function FriendsScreen() {
     return (
       <ThemedView style={[styles.container, { backgroundColor: background }]}>
         <SafeAreaView style={styles.safeArea}>
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.responsiveWrapper}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             <View style={styles.headerRow}>
               <Pressable onPress={() => setShowRequests(false)}>
-                <ThemedText style={{ color: primary, fontWeight: 'bold', fontSize: 16 }}>← Back</ThemedText>
+                <ThemedText style={{ color: primary, fontFamily: Fonts.sansBold, fontSize: 16 }}>← Back</ThemedText>
               </Pressable>
               <ThemedText type="title" style={{ color: text }}>Requests</ThemedText>
               <View style={{ width: 50 }} />
@@ -160,12 +162,12 @@ export default function FriendsScreen() {
                 ) : (
                   incomingRequests.map((req) => (
                     <View key={req.id} style={[styles.row, { backgroundColor: backgroundElement }]}>
-                      <ThemedText style={{ color: text, fontWeight: 'bold' }}>{req.sender?.username || 'Unknown'}</ThemedText>
+                      <ThemedText style={{ color: text, fontFamily: Fonts.sansBold }}>{req.sender?.username || 'Unknown'}</ThemedText>
                       <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-                        <Pressable style={[styles.btnSmall, { backgroundColor: primary }]} onPress={() => acceptFriendRequest(req.id)}>
+                        <Pressable style={[styles.btnSmall, { backgroundColor: success }]} onPress={() => acceptFriendRequest(req.id)}>
                           <ThemedText style={styles.btnText}>Accept</ThemedText>
                         </Pressable>
-                        <Pressable style={[styles.btnSmall, { backgroundColor: '#E74C3C' }]} onPress={() => rejectRequest(req.id)}>
+                        <Pressable style={[styles.btnSmall, { backgroundColor: destructive }]} onPress={() => rejectRequest(req.id)}>
                           <ThemedText style={styles.btnText}>Reject</ThemedText>
                         </Pressable>
                       </View>
@@ -180,8 +182,8 @@ export default function FriendsScreen() {
                 ) : (
                   sentRequests.map((req) => (
                     <View key={req.id} style={[styles.row, { backgroundColor: backgroundElement }]}>
-                      <ThemedText style={{ color: text, fontWeight: 'bold' }}>{req.receiver?.username || 'Unknown'}</ThemedText>
-                      <Pressable style={[styles.btnSmall, { backgroundColor: '#E74C3C' }]} onPress={() => cancelRequest(req.id)}>
+                      <ThemedText style={{ color: text, fontFamily: Fonts.sansBold }}>{req.receiver?.username || 'Unknown'}</ThemedText>
+                      <Pressable style={[styles.btnSmall, { backgroundColor: destructive }]} onPress={() => cancelRequest(req.id)}>
                         <ThemedText style={styles.btnText}>Cancel</ThemedText>
                       </Pressable>
                     </View>
@@ -190,6 +192,7 @@ export default function FriendsScreen() {
               </View>
             )}
           </ScrollView>
+          </View>
         </SafeAreaView>
       </ThemedView>
     );
@@ -215,12 +218,13 @@ export default function FriendsScreen() {
   return (
     <ThemedView style={[styles.container, { backgroundColor: background }]}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={styles.responsiveWrapper}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {/* Header */}
           <View style={styles.headerRow}>
             <ThemedText type="title" style={{ color: text }}>Friends</ThemedText>
             <Pressable style={[styles.requestsBtn, { backgroundColor: primary }]} onPress={() => setShowRequests(true)}>
-              <ThemedText style={{ color: background, fontWeight: 'bold', fontSize: 13 }}>
+              <ThemedText style={{ color: background, fontFamily: Fonts.sansBold, fontSize: 13 }}>
                 Requests{incomingRequests.length > 0 ? ` (${incomingRequests.length})` : ''}
               </ThemedText>
             </Pressable>
@@ -228,7 +232,7 @@ export default function FriendsScreen() {
 
           {/* Search */}
           <View style={{ marginBottom: Spacing.three }}>
-            <ThemedText style={{ fontWeight: 'bold', color: text, marginBottom: Spacing.two }}>🔍 Find Friends</ThemedText>
+            <ThemedText style={{ fontFamily: Fonts.sansBold, color: text, marginBottom: Spacing.two }}>🔍 Find Friends</ThemedText>
             <View style={{ flexDirection: 'row', gap: Spacing.two }}>
               <TextInput
                 style={[styles.input, { borderColor: secondary, color: text, flex: 1 }]}
@@ -239,7 +243,7 @@ export default function FriendsScreen() {
                 onSubmitEditing={searchUsers}
               />
               <Pressable style={[styles.btn, { backgroundColor: primary }]} onPress={searchUsers}>
-                <ThemedText style={{ color: background, fontWeight: 'bold' }}>Search</ThemedText>
+                <ThemedText style={{ color: background, fontFamily: Fonts.sansBold }}>Search</ThemedText>
               </Pressable>
             </View>
           </View>
@@ -247,7 +251,7 @@ export default function FriendsScreen() {
           {/* Search Results */}
           {searchResults.length > 0 && (
             <View style={{ marginBottom: Spacing.three }}>
-              <ThemedText style={{ fontWeight: 'bold', marginBottom: Spacing.two, color: text }}>Results</ThemedText>
+              <ThemedText style={{ fontFamily: Fonts.sansBold, marginBottom: Spacing.two, color: text }}>Results</ThemedText>
               {searchResults.map((u) => {
                 const action = getSearchResultAction(u.id);
                 return (
@@ -259,7 +263,7 @@ export default function FriendsScreen() {
                       </Pressable>
                     )}
                     {action.type === 'accept' && (
-                      <Pressable style={[styles.btnSmall, { backgroundColor: '#27AE60' }]} onPress={() => acceptFriendRequest(action.requestId!)}>
+                      <Pressable style={[styles.btnSmall, { backgroundColor: success }]} onPress={() => acceptFriendRequest(action.requestId!)}>
                         <ThemedText style={styles.btnText}>Accept Req</ThemedText>
                       </Pressable>
                     )}
@@ -269,7 +273,7 @@ export default function FriendsScreen() {
                       </View>
                     )}
                     {action.type === 'friends' && (
-                      <View style={[styles.btnSmall, { backgroundColor: '#27AE60', opacity: 0.6 }]}>
+                      <View style={[styles.btnSmall, { backgroundColor: success, opacity: 0.6 }]}>
                         <ThemedText style={styles.btnText}>Friends ✓</ThemedText>
                       </View>
                     )}
@@ -282,18 +286,18 @@ export default function FriendsScreen() {
           {/* Friends who invited you to a session — shown at the TOP */}
           {friendsWithInvites.length > 0 && (
             <View style={{ marginBottom: Spacing.three }}>
-              <ThemedText style={{ fontWeight: 'bold', marginBottom: Spacing.two, color: text }}>🔔 Session Invites</ThemedText>
+              <ThemedText style={{ fontFamily: Fonts.sansBold, marginBottom: Spacing.two, color: text }}>🔔 Session Invites</ThemedText>
               {friendsWithInvites.map((item) => (
                 <View key={item.id} style={[styles.row, { backgroundColor: backgroundElement, borderWidth: 2, borderColor: primary }]}>
                   <View>
-                    <ThemedText style={{ color: text, fontWeight: 'bold' }}>{item._friend.username}</ThemedText>
+                    <ThemedText style={{ color: text, fontFamily: Fonts.sansBold }}>{item._friend.username}</ThemedText>
                     <ThemedText style={{ color: secondary, fontSize: 11 }}>Invited you to focus together!</ThemedText>
                   </View>
                   <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-                    <Pressable style={[styles.btnSmall, { backgroundColor: '#27AE60' }]} onPress={() => handleAcceptSessionInvite(item._invite)}>
+                    <Pressable style={[styles.btnSmall, { backgroundColor: success }]} onPress={() => handleAcceptSessionInvite(item._invite)}>
                       <ThemedText style={styles.btnText}>Join</ThemedText>
                     </Pressable>
-                    <Pressable style={[styles.btnSmall, { backgroundColor: '#E74C3C' }]} onPress={() => declineInvite(item._invite.id)}>
+                    <Pressable style={[styles.btnSmall, { backgroundColor: destructive }]} onPress={() => declineInvite(item._invite.id)}>
                       <ThemedText style={styles.btnText}>Decline</ThemedText>
                     </Pressable>
                   </View>
@@ -304,14 +308,14 @@ export default function FriendsScreen() {
 
           {/* Regular Friends */}
           <View style={{ marginBottom: Spacing.six }}>
-            <ThemedText style={{ fontWeight: 'bold', marginBottom: Spacing.two, color: text }}>👥 My Friends</ThemedText>
+            <ThemedText style={{ fontFamily: Fonts.sansBold, marginBottom: Spacing.two, color: text }}>👥 My Friends</ThemedText>
             {regularFriends.length === 0 && friendsWithInvites.length === 0 ? (
               <ThemedText style={{ color: secondary }}>No friends yet. Search and add someone!</ThemedText>
             ) : (
               regularFriends.map((item) => (
                 <View key={item.id} style={[styles.row, { backgroundColor: backgroundElement }]}>
-                  <ThemedText style={{ color: text, fontWeight: 'bold' }}>{item._friend.username}</ThemedText>
-                  <Pressable style={[styles.btnSmall, { backgroundColor: '#E74C3C' }]} onPress={() => removeFriend(item.id)}>
+                  <ThemedText style={{ color: text, fontFamily: Fonts.sansBold }}>{item._friend.username}</ThemedText>
+                  <Pressable style={[styles.btnSmall, { backgroundColor: destructive }]} onPress={() => removeFriend(item.id)}>
                     <ThemedText style={styles.btnText}>Remove</ThemedText>
                   </Pressable>
                 </View>
@@ -319,6 +323,7 @@ export default function FriendsScreen() {
             )}
           </View>
         </ScrollView>
+        </View>
       </SafeAreaView>
     </ThemedView>
   );
@@ -326,15 +331,37 @@ export default function FriendsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1, paddingHorizontal: Spacing.four, paddingTop: Spacing.four },
+  safeArea: { flex: 1, alignItems: 'center' },
+  responsiveWrapper: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 600,
+  },
+  scrollContent: {
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.four,
+    paddingBottom: Spacing.six,
+  },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.three },
   requestsBtn: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, borderRadius: 20 },
   tabBar: { flexDirection: 'row', borderRadius: 20, overflow: 'hidden' },
   tab: { flex: 1, paddingVertical: Spacing.two, alignItems: 'center' },
-  tabText: { fontWeight: 'bold', fontSize: 14 },
+  tabText: { fontFamily: Fonts.sansBold, fontSize: 14 },
   input: { borderWidth: 1, padding: Spacing.two, borderRadius: Spacing.two },
   btn: { padding: Spacing.two, borderRadius: Spacing.two, justifyContent: 'center' },
   btnSmall: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.one, borderRadius: Spacing.two },
-  btnText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.three, borderRadius: Spacing.two, marginBottom: Spacing.two },
+  btnText: { color: '#fff', fontSize: 12, fontFamily: Fonts.sansBold },
+  row: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: Spacing.three, 
+    borderRadius: Spacing.two, 
+    marginBottom: Spacing.two,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
 });

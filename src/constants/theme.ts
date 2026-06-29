@@ -9,55 +9,98 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    primary: '#054A91', // Primary Dark Blue
-    secondary: '#3E7CB1', // Secondary Blue
-    tertiary: '#81A4CD', // Soft Light Blue
-    background: '#DBE4EE', // Light Background
-    backgroundElement: '#ffffff',
-    backgroundSelected: '#81A4CD',
-    text: '#054A91',
-    textSecondary: '#3E7CB1',
-    white: '#ffffff',
-    timerCircle: '#81A4CD',
-    timerProgress: '#054A91',
+    focus: {
+      primary: '#D9381E', // Vermilion Red
+      secondary: '#F2A65A', // Warm Amber
+      tertiary: '#F5D0C5',
+      background: '#FFF9F8',
+      backgroundElement: 'rgba(0, 0, 0, 0.06)',
+      backgroundSelected: '#FADBD8',
+      text: '#2C1E16',
+      textSecondary: '#6B4A3E',
+      white: '#ffffff',
+      timerCircle: '#FADBD8',
+      timerProgress: '#D9381E',
+      success: '#5C6E61',
+      destructive: '#D9381E',
+    },
+    break: {
+      primary: '#1B4965', // Deep Ocean Blue
+      secondary: '#62B6CB', // Soft Cyan
+      tertiary: '#CAE9FF',
+      background: '#F4FAFF',
+      backgroundElement: 'rgba(0, 0, 0, 0.06)',
+      backgroundSelected: '#CAE9FF',
+      text: '#13293D',
+      textSecondary: '#415A77',
+      white: '#ffffff',
+      timerCircle: '#CAE9FF',
+      timerProgress: '#1B4965',
+      success: '#5C6E61',
+      destructive: '#D9381E',
+    }
   },
   dark: {
-    primary: '#81A4CD',
-    secondary: '#3E7CB1',
-    tertiary: '#054A91',
-    background: '#121212', // Dark background for dark mode
-    backgroundElement: '#1E1E1E',
-    backgroundSelected: '#3E7CB1',
-    text: '#DBE4EE',
-    textSecondary: '#81A4CD',
-    white: '#ffffff',
-    timerCircle: '#3E7CB1',
-    timerProgress: '#81A4CD',
+    focus: {
+      primary: '#FF6B57', // Bright Vermilion
+      secondary: '#FFC28A', // Soft Amber
+      tertiary: '#3D2622',
+      background: '#1A1110', // Very dark warm tint
+      backgroundElement: 'rgba(255, 255, 255, 0.1)',
+      backgroundSelected: '#3D2622',
+      text: '#FFF1EE',
+      textSecondary: '#D9C5C1',
+      white: '#ffffff',
+      timerCircle: '#3D2622',
+      timerProgress: '#FF6B57',
+      success: '#8A9E8F',
+      destructive: '#FF6B57',
+    },
+    break: {
+      primary: '#5FA8D3', // Bright Ocean Blue
+      secondary: '#89C2D9', // Soft Cyan
+      tertiary: '#1E3544',
+      background: '#0D161B', // Very dark cool tint
+      backgroundElement: 'rgba(255, 255, 255, 0.1)',
+      backgroundSelected: '#1E3544',
+      text: '#E5F2FC',
+      textSecondary: '#A7C4D9',
+      white: '#ffffff',
+      timerCircle: '#1E3544',
+      timerProgress: '#5FA8D3',
+      success: '#8A9E8F',
+      destructive: '#FF6B57',
+    }
   },
 } as const;
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+export type ThemeColor = keyof typeof Colors.light.focus;
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
+    sans: 'PlusJakartaSans_400Regular',
+    sansMedium: 'PlusJakartaSans_500Medium',
+    sansBold: 'PlusJakartaSans_700Bold',
+    serif: 'Literata_400Regular',
+    serifBold: 'Literata_700Bold',
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {
-    sans: 'normal',
-    serif: 'serif',
+    sans: 'PlusJakartaSans_400Regular',
+    sansMedium: 'PlusJakartaSans_500Medium',
+    sansBold: 'PlusJakartaSans_700Bold',
+    serif: 'Literata_400Regular',
+    serifBold: 'Literata_700Bold',
     rounded: 'normal',
     mono: 'monospace',
   },
   web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
+    sans: 'PlusJakartaSans_400Regular',
+    sansMedium: 'PlusJakartaSans_500Medium',
+    sansBold: 'PlusJakartaSans_700Bold',
+    serif: 'Literata_400Regular',
+    serifBold: 'Literata_700Bold',
     rounded: 'var(--font-rounded)',
     mono: 'var(--font-mono)',
   },

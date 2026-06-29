@@ -2,11 +2,24 @@ import { Tabs } from 'expo-router';
 import { useColorScheme } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { Fonts } from '@/constants/theme';
+import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
+
+function AnimatedTabBarBackground() {
+  const colors = useTheme();
+  
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      backgroundColor: withTiming(colors.background, { duration: 400 }),
+    };
+  }, [colors.background]);
+
+  return <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, animatedStyle]} />;
+}
 
 export default function AppTabs() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const colors = useTheme();
 
   return (
     <Tabs
@@ -14,13 +27,21 @@ export default function AppTabs() {
         headerShown: false,
         tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.secondary,
+        tabBarBackground: () => <AnimatedTabBarBackground />,
         tabBarStyle: {
-          backgroundColor: colors.backgroundElement,
-          borderTopColor: colors.backgroundElement,
-          height: 65,
-          paddingBottom: 10,
+          backgroundColor: 'transparent',
+          borderTopWidth: 0,
+          elevation: 0,
+          shadowOpacity: 0,
+          height: 75,
+          paddingBottom: 20,
           paddingTop: 5,
         },
+        tabBarLabelStyle: {
+          fontFamily: Fonts.sans,
+          fontSize: 12,
+          fontWeight: '600',
+        }
       }}>
       <Tabs.Screen
         name="index"

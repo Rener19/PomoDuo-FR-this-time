@@ -4,7 +4,8 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useEffect } from 'react';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
-
+import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
+import { Literata_400Regular, Literata_500Medium, Literata_600SemiBold, Literata_700Bold } from '@expo-google-fonts/literata';
 LogBox.ignoreLogs(['new NativeEventEmitter']);
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
@@ -21,6 +22,17 @@ WebBrowser.maybeCompleteAuthSession();
 export default function TabLayout() {
   const { isDarkMode } = useSettingsStore();
   const { session, initialized, initialize } = useAuthStore();
+  
+  const [fontsLoaded] = useFonts({
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    Literata_400Regular,
+    Literata_500Medium,
+    Literata_600SemiBold,
+    Literata_700Bold,
+  });
 
   useEffect(() => {
     initialize();
@@ -28,15 +40,17 @@ export default function TabLayout() {
 
   // Warm up the browser on Android so the first login opens instantly
   useEffect(() => {
-    WebBrowser.warmUpAsync();
+    try {
+      WebBrowser.warmUpAsync().catch(() => {});
+    } catch (e) {}
     return () => {
-      WebBrowser.coolDownAsync();
+      try {
+        WebBrowser.coolDownAsync().catch(() => {});
+      } catch (e) {}
     };
   }, []);
 
-  // Global deep link listener removed to prevent race conditions with WebBrowser.openAuthSessionAsync
-
-  if (!initialized) {
+  if (!initialized || !fontsLoaded) {
     return null;
   }
 

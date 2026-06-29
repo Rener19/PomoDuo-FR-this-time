@@ -1,19 +1,24 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View, Text, Dimensions } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import Animated, { useSharedValue, useAnimatedProps, withTiming, Easing } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedProps, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { useTimerStore } from '@/store/timerStore';
 import { useDuoStore } from '@/store/duoStore';
 import { useTheme } from '@/hooks/use-theme';
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+import { Fonts, Colors } from '@/constants/theme';
+import { useSettingsStore } from '@/store/settingsStore';
 
-export function TimerRing({ size = 280, strokeWidth = 18 }) {
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const { width } = Dimensions.get('window');
+const defaultSize = Math.min(width * 0.75, 320);
+
+export function TimerRing({ size = defaultSize, strokeWidth = 8 }) {
   const soloState = useTimerStore();
   const duoState = useDuoStore();
   
   // If we're in a duo session, read from duoStore; otherwise use soloStore
-  const isDuo = !!duoState.sessionId;
+  const isDuo = !!duoState.sessionId && !duoState.waitingForFriends;
   const timeLeft = isDuo ? duoState.timeLeft : soloState.timeLeft;
   const totalFocusTime = isDuo ? duoState.focusTime : soloState.totalFocusTime;
   const breakTime = isDuo ? duoState.breakTime : soloState.breakTime;
@@ -24,14 +29,17 @@ export function TimerRing({ size = 280, strokeWidth = 18 }) {
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   
-  const { timerCircle: timerCircleColor, timerProgress: timerProgressColor } = useTheme();
-  
+  const isDarkMode = useSettingsStore(state => state.isDarkMode);
+  const themeMode = isDarkMode ? 'dark' : 'light';
+  const focusColors = Colors[themeMode].focus;
+  const breakColors = Colors[themeMode].break;
+
   const totalTime = mode === 'focus' ? totalFocusTime * 60 : breakTime * 60;
   let progress = totalTime > 0 ? timeLeft / totalTime : 0;
   if (Number.isNaN(progress) || progress === undefined || progress === null || !Number.isFinite(progress)) {
     progress = 0;
   }
-  
+
   const strokeDashoffset = useSharedValue(circumference);
 
   useEffect(() => {
@@ -41,9 +49,32 @@ export function TimerRing({ size = 280, strokeWidth = 18 }) {
     });
   }, [progress, circumference]);
 
-  const animatedProps = useAnimatedProps(() => ({
-    strokeDashoffset: strokeDashoffset.value,
-  }));
+  const isFocus = mode === 'focus';
+
+  // Opacity styles for perfect synchronization with ThemedView
+  const focusOpacityStyle = useAnimatedStyle(() => {
+    return {
+      opacity: withTiming(isFocus ? 1 : 0, { duration: 400 }),
+    };
+  }, [isFocus]);
+
+  const breakOpacityStyle = useAnimatedStyle(() => {
+    return {
+      opacity: withTiming(isFocus ? 0 : 1, { duration: 400 }),
+    };
+  }, [isFocus]);
+
+  const animatedDashoffset = useAnimatedProps(() => {
+    return {
+      strokeDashoffset: strokeDashoffset.value,
+    };
+  });
+
+  const animatedTextStyle = useAnimatedStyle(() => {
+    return {
+      color: withTiming(isFocus ? focusColors.timerProgress : breakColors.timerProgress, { duration: 400 }),
+    };
+  }, [isFocus, focusColors, breakColors]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -58,42 +89,70 @@ export function TimerRing({ size = 280, strokeWidth = 18 }) {
   };
 
   return (
-    <View style={styles.container}>
-      <Svg width={size} height={size}>
-        {/* Background Circle */}
-        <Circle
-          stroke={timerCircleColor}
-          fill="none"
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          strokeWidth={strokeWidth}
-        />
-        {/* Progress Circle */}
-        <AnimatedCircle
-          stroke={timerProgressColor}
-          fill="none"
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          animatedProps={animatedProps}
-          strokeLinecap="round"
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
-      </Svg>
+    <View style={[styles.container, { width: size, height: size }]}>
+      {/* Break Mode SVG Layer */}
+      <Animated.View style={[{ position: 'absolute' }, breakOpacityStyle]}>
+        <Svg width={size} height={size}>
+          <Circle
+            fill="none"
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            strokeWidth={strokeWidth}
+            stroke={breakColors.timerCircle}
+          />
+          <AnimatedCircle
+            fill="none"
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            animatedProps={animatedDashoffset}
+            strokeLinecap="round"
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            stroke={breakColors.timerProgress}
+          />
+        </Svg>
+      </Animated.View>
+
+      {/* Focus Mode SVG Layer */}
+      <Animated.View style={[{ position: 'absolute' }, focusOpacityStyle]}>
+        <Svg width={size} height={size}>
+          <Circle
+            fill="none"
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            strokeWidth={strokeWidth}
+            stroke={focusColors.timerCircle}
+          />
+          <AnimatedCircle
+            fill="none"
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            animatedProps={animatedDashoffset}
+            strokeLinecap="round"
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            stroke={focusColors.timerProgress}
+          />
+        </Svg>
+      </Animated.View>
+
       <View style={styles.textContainer}>
-        <Text style={[styles.timeText, { color: timerProgressColor }]}>
+        <Animated.Text style={[styles.timeText, animatedTextStyle]}>
           {formatTime(timeLeft)}
-        </Text>
-        <Text style={[styles.modeText, { color: timerProgressColor }]}>
+        </Animated.Text>
+        <Animated.Text style={[styles.modeText, animatedTextStyle]}>
           {mode === 'focus' ? 'Focus' : 'Break'}
-        </Text>
+        </Animated.Text>
         {isRunning && targetEndTime && (
-          <Text style={[styles.endTimeText, { color: timerProgressColor, opacity: 0.8 }]}>
+          <Animated.Text style={[styles.endTimeText, animatedTextStyle, { opacity: 0.8 }]}>
             🔔 Ends at {getEndTimeText()}
-          </Text>
+          </Animated.Text>
         )}
       </View>
     </View>
@@ -111,20 +170,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   timeText: {
-    fontSize: 64,
-    fontWeight: 'bold',
+    fontFamily: Fonts.serifBold,
+    fontSize: 72,
+    letterSpacing: -1.5,
     fontVariant: ['tabular-nums'],
   },
   modeText: {
-    fontSize: 22,
+    fontFamily: Fonts.sansBold,
+    fontSize: 14,
     textTransform: 'uppercase',
     marginTop: 4,
-    fontWeight: '600',
     letterSpacing: 2,
   },
   endTimeText: {
+    fontFamily: Fonts.sansMedium,
     fontSize: 14,
     marginTop: 8,
-    fontWeight: '500',
   },
 });

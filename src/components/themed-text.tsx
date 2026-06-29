@@ -1,4 +1,5 @@
-import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
+import { Platform, StyleSheet, TextProps } from 'react-native';
+import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
 import { Fonts, ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -10,11 +11,17 @@ export type ThemedTextProps = TextProps & {
 
 export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
   const theme = useTheme();
+  const textColor = theme[themeColor ?? 'text'];
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      color: withTiming(textColor, { duration: 400 }),
+    };
+  }, [textColor]);
 
   return (
-    <Text
+    <Animated.Text
       style={[
-        { color: theme[themeColor ?? 'text'] },
         type === 'default' && styles.default,
         type === 'title' && styles.title,
         type === 'small' && styles.small,
@@ -23,6 +30,7 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
         type === 'link' && styles.link,
         type === 'linkPrimary' && styles.linkPrimary,
         type === 'code' && styles.code,
+        animatedStyle,
         style,
       ]}
       {...rest}
@@ -32,31 +40,32 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
 
 const styles = StyleSheet.create({
   small: {
+    fontFamily: Fonts.sansMedium,
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: 500,
   },
   smallBold: {
+    fontFamily: Fonts.sansBold,
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: 700,
   },
   default: {
+    fontFamily: Fonts.sansMedium,
     fontSize: 16,
     lineHeight: 24,
-    fontWeight: 500,
   },
   title: {
+    fontFamily: Fonts.serifBold,
     fontSize: 48,
-    fontWeight: 600,
     lineHeight: 52,
   },
   subtitle: {
+    fontFamily: Fonts.serifBold,
     fontSize: 32,
     lineHeight: 44,
-    fontWeight: 600,
   },
   link: {
+    fontFamily: Fonts.sans,
     lineHeight: 30,
     fontSize: 14,
   },

@@ -38,6 +38,11 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   setTotalFocusTime: (minutes: number) => {
     set((state) => {
       const diffMinutes = minutes - state.totalFocusTime;
+      if (diffMinutes < 0) {
+        if (state.mode === 'focus' && state.timeLeft < 60) return state;
+        if (state.mode !== 'focus' && state.savedFocusTimeLeft !== null && state.savedFocusTimeLeft < 60) return state;
+      }
+
       let newTimeLeft = state.timeLeft;
       let newSavedFocus = state.savedFocusTimeLeft;
 
@@ -55,6 +60,11 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   setBreakTime: (minutes: number) => {
     set((state) => {
       const diffMinutes = minutes - state.breakTime;
+      if (diffMinutes < 0) {
+        if (state.mode === 'break' && state.timeLeft < 60) return state;
+        if (state.mode !== 'break' && state.savedBreakTimeLeft !== null && state.savedBreakTimeLeft < 60) return state;
+      }
+
       let newTimeLeft = state.timeLeft;
       let newSavedBreak = state.savedBreakTimeLeft;
 
@@ -105,23 +115,25 @@ export const useTimerStore = create<TimerState>((set, get) => ({
         if (state.mode === 'focus') {
           const user = useAuthStore.getState().user;
           if (user) {
-            supabase.rpc('log_focus_time', {
-              user_id: user.id,
-              minutes_added: state.totalFocusTime
-            }).then(({ error }) => {
+            (async () => {
+              const { error } = await supabase.rpc('log_focus_time', {
+                user_id: user.id,
+                minutes_added: state.totalFocusTime
+              });
               if (error) console.error('Failed to log focus time:', error);
-            });
+            })();
           }
         }
 
         const nextMode = state.mode === 'focus' ? 'break' : 'focus';
         const nextTimeLeft = nextMode === 'focus' ? state.totalFocusTime * 60 : state.breakTime * 60;
+        const newTargetEndTime = state.targetEndTime + nextTimeLeft * 1000;
         
         return { 
           mode: nextMode, 
           timeLeft: nextTimeLeft, 
           isRunning: true, 
-          targetEndTime: Date.now() + nextTimeLeft * 1000,
+          targetEndTime: newTargetEndTime,
           savedFocusTimeLeft: nextMode === 'focus' ? null : state.savedFocusTimeLeft,
           savedBreakTimeLeft: nextMode === 'break' ? null : state.savedBreakTimeLeft,
         };
@@ -165,22 +177,25 @@ export const useTimerStore = create<TimerState>((set, get) => ({
         if (state.mode === 'focus') {
           const user = useAuthStore.getState().user;
           if (user) {
-            supabase.rpc('log_focus_time', {
-              user_id: user.id,
-              minutes_added: state.totalFocusTime
-            }).catch(e => console.error(e));
+            (async () => {
+              const { error } = await supabase.rpc('log_focus_time', {
+                user_id: user.id,
+                minutes_added: state.totalFocusTime
+              });
+              if (error) console.error(error);
+            })();
           }
         }
 
         const nextMode = state.mode === 'focus' ? 'break' : 'focus';
         const nextTimeLeft = nextMode === 'focus' ? state.totalFocusTime * 60 : state.breakTime * 60;
-        // In background, auto-start might drift or be blocked, but we'll try to auto-start anyway
-        // Or actually, it's safer to just start it.
+        const newTargetEndTime = state.targetEndTime + nextTimeLeft * 1000;
+        
         return { 
           mode: nextMode, 
           timeLeft: nextTimeLeft, 
           isRunning: true, 
-          targetEndTime: Date.now() + nextTimeLeft * 1000,
+          targetEndTime: newTargetEndTime,
           savedFocusTimeLeft: nextMode === 'focus' ? null : state.savedFocusTimeLeft,
           savedBreakTimeLeft: nextMode === 'break' ? null : state.savedBreakTimeLeft,
         };

@@ -10,7 +10,7 @@ import { useTimerStore } from '@/store/timerStore';
 import { useDuoStore } from '@/store/duoStore';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
-import { Spacing } from '@/constants/theme';
+import { Spacing, Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import BackgroundTimer from 'react-native-background-timer';
 import { safeSetInterval, safeClearInterval } from '@/lib/timerUtils';
@@ -19,33 +19,35 @@ export default function HomeScreen() {
   const { isRunning, start, pause, reset, tick, syncFromBackground, mode, switchMode, totalFocusTime, breakTime, setTotalFocusTime, setBreakTime, timeLeft } = useTimerStore();
   const duo = useDuoStore();
   const { user, profile } = useAuthStore();
-  const { background, text: textColor, primary, secondary, backgroundElement } = useTheme();
+  const theme = useTheme();
+  const { background, text: textColor, primary, secondary, backgroundElement, success, destructive } = theme;
 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [friends, setFriends] = useState<any[]>([]);
-  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
 
   // All hooks must run before any conditional returns
   useEffect(() => {
     syncFromBackground();
     let interval: any;
-    if (isRunning && !duo.sessionId) {
+    const isDuoActive = duo.sessionId && !duo.waitingForFriends;
+    if (isRunning && !isDuoActive) {
       interval = safeSetInterval(() => tick(), 1000);
     }
     return () => safeClearInterval(interval);
-  }, [isRunning, duo.sessionId]);
+  }, [isRunning, duo.sessionId, duo.waitingForFriends]);
 
   // Handle app background/foreground for solo timer
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active' && !duo.sessionId) {
+      const isDuoActive = duo.sessionId && !duo.waitingForFriends;
+      if (nextAppState === 'active' && !isDuoActive) {
         syncFromBackground();
       }
     });
     return () => {
       subscription.remove();
     };
-  }, [syncFromBackground, duo.sessionId]);
+  }, [syncFromBackground, duo.sessionId, duo.waitingForFriends]);
 
   // Subscribe to invites when user is logged in
   useEffect(() => {
@@ -72,28 +74,29 @@ export default function HomeScreen() {
     if (data) setFriends(data);
   }
 
-  function toggleFriend(friendId: string) {
-    setSelectedFriends((prev) =>
-      prev.includes(friendId) ? prev.filter((id) => id !== friendId) : [...prev, friendId]
-    );
-  }
-
-  async function handleSendInvites() {
-    if (!user || !profile || selectedFriends.length === 0) return;
+  async function handleIndividualInvite(friendId: string) {
+    if (!user || !profile) return;
     const username = profile.username || 'Host';
     const currentTimer = useTimerStore.getState();
-    await duo.inviteFriends(
-      user.id,
-      username,
-      selectedFriends,
-      currentTimer.totalFocusTime,
-      currentTimer.breakTime,
-      currentTimer.mode,
-      currentTimer.timeLeft,
-      currentTimer.isRunning
-    );
-    setShowInviteModal(false);
-    setSelectedFriends([]);
+    
+    if (!duo.sessionId) {
+      await duo.inviteFriends(
+        user.id,
+        username,
+        [friendId],
+        currentTimer.totalFocusTime,
+        currentTimer.breakTime,
+        currentTimer.mode,
+        currentTimer.timeLeft,
+        currentTimer.isRunning
+      );
+    } else {
+      await duo.inviteMoreFriends(user.id, [friendId]);
+    }
+  }
+
+  async function handleCancelInvite(friendId: string) {
+    await duo.cancelSentInvite(friendId);
   }
 
   async function handleAcceptInvite(invite: any) {
@@ -104,7 +107,9 @@ export default function HomeScreen() {
   }
 
   // ─── Duo Mode ──────────────────────────────────────────────
-  if (duo.sessionId) {
+  const isDuoActive = duo.sessionId && !duo.waitingForFriends;
+  
+  if (isDuoActive) {
     return <DuoTimer onLeave={() => { if (user) duo.leaveSession(user.id); }} />;
   }
 
@@ -112,11 +117,12 @@ export default function HomeScreen() {
   return (
     <ThemedView style={[styles.container, { backgroundColor: background }]}>
       <SafeAreaView style={styles.safeArea}>
+        <View style={styles.responsiveWrapper}>
 
         <View style={styles.bannerContainer}>
           {/* Pending invites banner */}
           {duo.pendingInvites.length > 0 && (
-            <View style={[styles.inviteBanner, { backgroundColor: primary }]}>
+            <ThemedView type="primary" style={styles.inviteBanner}>
               <ThemedText style={{ color: '#fff', fontWeight: 'bold', fontSize: 14, marginBottom: Spacing.two }}>
                 🔔 You have {duo.pendingInvites.length} session invite{duo.pendingInvites.length > 1 ? 's' : ''}
               </ThemedText>
@@ -126,106 +132,104 @@ export default function HomeScreen() {
                     {inv.inviter?.username || 'Someone'} invited you
                   </ThemedText>
                   <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-                    <Pressable style={[styles.inviteBtn, { backgroundColor: '#27AE60' }]} onPress={() => handleAcceptInvite(inv)}>
-                      <ThemedText style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Accept</ThemedText>
+                    <Pressable style={[styles.inviteBtn, { backgroundColor: success }]} onPress={() => handleAcceptInvite(inv)}>
+                      <ThemedText style={{ color: '#fff', fontSize: 12, fontFamily: Fonts.sansBold }}>Accept</ThemedText>
                     </Pressable>
-                    <Pressable style={[styles.inviteBtn, { backgroundColor: '#E74C3C' }]} onPress={() => duo.declineInvite(inv.id)}>
-                      <ThemedText style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Decline</ThemedText>
+                    <Pressable style={[styles.inviteBtn, { backgroundColor: destructive }]} onPress={() => duo.declineInvite(inv.id)}>
+                      <ThemedText style={{ color: '#fff', fontSize: 12, fontFamily: Fonts.sansBold }}>Decline</ThemedText>
                     </Pressable>
                   </View>
                 </View>
               ))}
-            </View>
+            </ThemedView>
           )}
 
 
         </View>
 
-        <ThemedText type="title" style={[styles.title, { color: textColor }]}>
-          PomoDuo
+        <ThemedText type="title" themeColor="primary" style={styles.title}>
+          Together Focus
         </ThemedText>
 
-        <ThemedView style={[styles.timerContainer, { backgroundColor: 'transparent' }]}>
+        <ThemedView style={[styles.timerContainer, { backgroundColor: 'transparent', flex: 2 }]}>
           <TimerRing />
         </ThemedView>
 
         {/* Time Settings */}
-        {!isRunning && !duo.waitingForFriends && (
-          <View style={styles.timeSettingsRow}>
-            <View style={styles.timeSetting}>
-              <ThemedText style={{ color: secondary, fontSize: 12, fontWeight: 'bold' }}>FOCUS</ThemedText>
-              <View style={styles.timeAdjuster}>
-                <Pressable onPress={() => setTotalFocusTime(Math.max(1, totalFocusTime - 1))}>
-                  <ThemedText style={{ color: textColor, fontSize: 24, paddingHorizontal: 10 }}>-</ThemedText>
-                </Pressable>
-                <ThemedText style={{ color: textColor, fontSize: 18, fontWeight: 'bold', width: 40, textAlign: 'center' }}>
-                  {totalFocusTime}
-                </ThemedText>
-                <Pressable onPress={() => setTotalFocusTime(Math.min(120, totalFocusTime + 1))}>
-                  <ThemedText style={{ color: textColor, fontSize: 24, paddingHorizontal: 10 }}>+</ThemedText>
-                </Pressable>
+        <View style={{ flex: 1, justifyContent: 'center', width: '100%' }}>
+          {!isRunning && (
+            <View style={[styles.timeSettingsRow, { marginBottom: 0 }]}>
+              <View style={styles.timeSetting}>
+                <ThemedText style={{ color: secondary, fontSize: 12, fontFamily: Fonts.sansBold }}>FOCUS</ThemedText>
+                <View style={styles.timeAdjuster}>
+                  <Pressable onPress={() => setTotalFocusTime(Math.max(1, totalFocusTime - 1))}>
+                    <ThemedText style={{ color: textColor, fontSize: 24, paddingHorizontal: 10 }}>-</ThemedText>
+                  </Pressable>
+                  <ThemedText style={{ color: textColor, fontSize: 18, fontFamily: Fonts.sansBold, width: 40, textAlign: 'center' }}>
+                    {totalFocusTime}
+                  </ThemedText>
+                  <Pressable onPress={() => setTotalFocusTime(Math.min(120, totalFocusTime + 1))}>
+                    <ThemedText style={{ color: textColor, fontSize: 24, paddingHorizontal: 10 }}>+</ThemedText>
+                  </Pressable>
+                </View>
+              </View>
+              <View style={styles.timeSetting}>
+                <ThemedText style={{ color: secondary, fontSize: 12, fontFamily: Fonts.sansBold }}>BREAK</ThemedText>
+                <View style={styles.timeAdjuster}>
+                  <Pressable onPress={() => setBreakTime(Math.max(1, breakTime - 1))}>
+                    <ThemedText style={{ color: textColor, fontSize: 24, paddingHorizontal: 10 }}>-</ThemedText>
+                  </Pressable>
+                  <ThemedText style={{ color: textColor, fontSize: 18, fontFamily: Fonts.sansBold, width: 40, textAlign: 'center' }}>
+                    {breakTime}
+                  </ThemedText>
+                  <Pressable onPress={() => setBreakTime(Math.min(60, breakTime + 1))}>
+                    <ThemedText style={{ color: textColor, fontSize: 24, paddingHorizontal: 10 }}>+</ThemedText>
+                  </Pressable>
+                </View>
               </View>
             </View>
-            <View style={styles.timeSetting}>
-              <ThemedText style={{ color: secondary, fontSize: 12, fontWeight: 'bold' }}>BREAK</ThemedText>
-              <View style={styles.timeAdjuster}>
-                <Pressable onPress={() => setBreakTime(Math.max(1, breakTime - 1))}>
-                  <ThemedText style={{ color: textColor, fontSize: 24, paddingHorizontal: 10 }}>-</ThemedText>
-                </Pressable>
-                <ThemedText style={{ color: textColor, fontSize: 18, fontWeight: 'bold', width: 40, textAlign: 'center' }}>
-                  {breakTime}
-                </ThemedText>
-                <Pressable onPress={() => setBreakTime(Math.min(60, breakTime + 1))}>
-                  <ThemedText style={{ color: textColor, fontSize: 24, paddingHorizontal: 10 }}>+</ThemedText>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        )}
+          )}
+        </View>
 
         <ThemedView style={[styles.controls, { backgroundColor: 'transparent' }]}>
-          {!duo.waitingForFriends && (
+          <View style={[styles.controls, { backgroundColor: 'transparent' }]}>
             <>
-              <Pressable
-                style={[styles.button, { backgroundColor: primary }]}
-                onPress={isRunning ? pause : start}
-              >
-                <ThemedText style={{ color: background, fontWeight: 'bold', fontSize: 18, letterSpacing: 1 }}>
-                  {isRunning ? 'PAUSE' : 'START'}
-                </ThemedText>
+              <Pressable style={{ width: '80%' }} onPress={isRunning ? pause : start}>
+                <ThemedView type="primary" style={[styles.button, { width: '100%' }]}>
+                  <ThemedText themeColor="background" style={{ fontFamily: Fonts.sansBold, fontSize: 18, letterSpacing: 1 }}>
+                    {isRunning ? 'PAUSE' : 'START'}
+                  </ThemedText>
+                </ThemedView>
               </Pressable>
 
               <Pressable style={[styles.buttonSecondary, { borderColor: secondary }]} onPress={reset}>
-                <ThemedText style={{ color: textColor, fontWeight: 'bold', fontSize: 16 }}>RESET</ThemedText>
+                <ThemedText style={{ color: textColor, fontFamily: Fonts.sansBold, fontSize: 16 }}>RESET</ThemedText>
               </Pressable>
 
               <Pressable style={[styles.buttonSecondary, { borderColor: secondary }]} onPress={switchMode}>
-                <ThemedText style={{ color: textColor, fontWeight: 'bold', fontSize: 16 }}>
+                <ThemedText style={{ color: textColor, fontFamily: Fonts.sansBold, fontSize: 16 }}>
                   SWITCH TO {mode === 'focus' ? 'BREAK' : 'FOCUS'}
                 </ThemedText>
               </Pressable>
-
-              {/* Invite Friends Button */}
-              <Pressable
-                style={[styles.button, { backgroundColor: '#27AE60' }]}
-                onPress={() => setShowInviteModal(true)}
-              >
-                <ThemedText style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
-                  👥 Invite Friends to Session
-                </ThemedText>
+              <Pressable style={{ width: '80%' }} onPress={() => setShowInviteModal(true)}>
+                <ThemedView type="success" style={[styles.button, { width: '100%' }]}>
+                  <ThemedText style={{ color: '#fff', fontFamily: Fonts.sansBold, fontSize: 16 }}>
+                    Invite Friends to Session
+                  </ThemedText>
+                </ThemedView>
               </Pressable>
             </>
-          )}
+          </View>
         </ThemedView>
 
         {/* Invite Friends Modal */}
-        <Modal visible={showInviteModal} animationType="slide" transparent>
+        <Modal visible={showInviteModal} animationType="fade" transparent>
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { backgroundColor: background }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.three }}>
-                <ThemedText type="title" style={{ color: textColor, fontSize: 22 }}>Invite Friends</ThemedText>
-                <Pressable onPress={() => { setShowInviteModal(false); setSelectedFriends([]); }}>
-                  <ThemedText style={{ color: '#E74C3C', fontWeight: 'bold', fontSize: 16 }}>Close</ThemedText>
+                <ThemedText type="title" style={{ color: textColor, fontSize: 22, fontFamily: Fonts.serifBold }}>Invite Friends</ThemedText>
+                <Pressable onPress={() => setShowInviteModal(false)}>
+                  <ThemedText style={{ color: destructive, fontFamily: Fonts.sansBold, fontSize: 16 }}>Close</ThemedText>
                 </Pressable>
               </View>
 
@@ -238,39 +242,32 @@ export default function HomeScreen() {
                   friends.map((item) => {
                     const friend = item.user_id === user?.id ? item.u2 : item.u1;
                     if (!friend) return null;
-                    const isSelected = selectedFriends.includes(friend.id);
+                    const isInvited = duo.sentInvites.includes(friend.id);
                     return (
-                      <Pressable
-                        key={friend.id}
-                        style={[styles.friendRow, { backgroundColor: isSelected ? primary : backgroundElement }]}
-                        onPress={() => toggleFriend(friend.id)}
-                      >
-                        <ThemedText style={{ color: isSelected ? '#fff' : textColor, fontWeight: 'bold' }}>
+                      <ThemedView key={friend.id} type="backgroundElement" style={[styles.friendRow, { paddingVertical: Spacing.two }]}>
+                        <ThemedText themeColor="text" style={{ fontFamily: Fonts.sansBold, flex: 1 }}>
                           {friend.username}
                         </ThemedText>
-                        <ThemedText style={{ color: isSelected ? '#fff' : secondary, fontSize: 20 }}>
-                          {isSelected ? '✓' : '○'}
-                        </ThemedText>
-                      </Pressable>
+                        
+                        {isInvited ? (
+                          <Pressable style={[styles.inviteBtn, { backgroundColor: destructive }]} onPress={() => handleCancelInvite(friend.id)}>
+                            <ThemedText style={{ color: '#fff', fontFamily: Fonts.sansBold, fontSize: 12 }}>Cancel</ThemedText>
+                          </Pressable>
+                        ) : (
+                          <Pressable style={[styles.inviteBtn, { backgroundColor: success }]} onPress={() => handleIndividualInvite(friend.id)}>
+                            <ThemedText style={{ color: '#fff', fontFamily: Fonts.sansBold, fontSize: 12 }}>Invite</ThemedText>
+                          </Pressable>
+                        )}
+                      </ThemedView>
                     );
                   })
                 )}
               </ScrollView>
-
-              {selectedFriends.length > 0 && (
-                <Pressable
-                  style={[styles.button, { backgroundColor: primary, marginTop: Spacing.three }]}
-                  onPress={handleSendInvites}
-                >
-                  <ThemedText style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
-                    Send Invite to {selectedFriends.length} friend{selectedFriends.length > 1 ? 's' : ''}
-                  </ThemedText>
-                </Pressable>
-              )}
             </View>
           </View>
         </Modal>
 
+        </View>
       </SafeAreaView>
     </ThemedView>
   );
@@ -280,15 +277,22 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  responsiveWrapper: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 600,
     paddingHorizontal: Spacing.four,
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.three,
   },
   title: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    letterSpacing: 2,
+    fontFamily: Fonts.serifBold,
+    fontSize: 32,
+    letterSpacing: -0.5,
     marginBottom: Spacing.four,
   },
   timeSettingsRow: {
@@ -322,17 +326,17 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     width: '80%',
     alignItems: 'center',
-    elevation: 3,
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
   },
   buttonSecondary: {
     backgroundColor: 'transparent',
     paddingVertical: Spacing.two,
     borderRadius: 30,
-    borderWidth: 2,
+    borderWidth: 1.5,
     width: '80%',
     alignItems: 'center',
   },

@@ -43,7 +43,7 @@ export async function updateTimerNotification(mode: string, timeLeft: number, is
   }
   if (!alarmChannelSoundId) {
     alarmChannelSoundId = await notifee.createChannel({
-      id: 'pomoduo_alarms_custom_v1',
+      id: 'pomoduo_alarms_custom_v2',
       name: 'Timer Alarms (Sound)',
       importance: AndroidImportance.HIGH,
       sound: 'pomoduo_alarm',
@@ -52,9 +52,9 @@ export async function updateTimerNotification(mode: string, timeLeft: number, is
   }
   if (!alarmChannelSilentId) {
     alarmChannelSilentId = await notifee.createChannel({
-      id: 'pomoduo_alarms_silent_v1',
+      id: 'pomoduo_alarms_silent_v2',
       name: 'Timer Alarms (Silent)',
-      importance: AndroidImportance.HIGH,
+      importance: AndroidImportance.LOW, // LOW importance guarantees no sound/vibration
       visibility: AndroidVisibility.PUBLIC,
     });
   }
@@ -107,32 +107,40 @@ export async function updateTimerNotification(mode: string, timeLeft: number, is
   const { soundEnabled } = useSettingsStore.getState();
   
   if (timeLeft > 0) {
-    const trigger: TimestampTrigger = {
-      type: TriggerType.TIMESTAMP,
-      timestamp: targetEndTime || Date.now() + (timeLeft * 1000),
-      alarmManager: true, // Guarantees exact delivery on Android
-    };
+    const now = Date.now();
+    let fireTime = targetEndTime || now + (timeLeft * 1000);
+    if (fireTime <= now) {
+      fireTime = now + 1000; // guarantee future if edge case
+    }
+    
+    if (soundEnabled) {
+      const trigger: TimestampTrigger = {
+        type: TriggerType.TIMESTAMP,
+        timestamp: fireTime,
+        alarmManager: true, // Guarantees exact delivery on Android
+      };
 
-    const notificationPayload = {
-      id: `timer-end-${mode}`,
-      title: `Time's up!`,
-      body: `Your ${mode} session has ended.`,
-      android: {
-        channelId: soundEnabled ? alarmChannelSoundId : alarmChannelSilentId,
-        smallIcon: 'ic_launcher',
-        importance: AndroidImportance.HIGH,
-        pressAction: { id: 'default' },
-        category: AndroidCategory.ALARM,
-      },
-    };
+      const notificationPayload = {
+        id: `timer-end-${mode}`,
+        title: `Time's up!`,
+        body: `Your ${mode} session has ended.`,
+        android: {
+          channelId: alarmChannelSoundId,
+          smallIcon: 'ic_launcher',
+          importance: AndroidImportance.HIGH,
+          pressAction: { id: 'default' },
+          category: AndroidCategory.ALARM,
+        },
+      };
 
-    try {
-      await notifee.createTriggerNotification(notificationPayload, trigger);
-    } catch (e) {
-      // Fallback if SCHEDULE_EXACT_ALARM permission is denied on Android 12+
-      console.warn('AlarmManager failed, falling back without exact delivery.', e);
-      trigger.alarmManager = false;
-      await notifee.createTriggerNotification(notificationPayload, trigger).catch(console.error);
+      try {
+        await notifee.createTriggerNotification(notificationPayload, trigger);
+      } catch (e) {
+        // Fallback if SCHEDULE_EXACT_ALARM permission is denied on Android 12+
+        console.warn('AlarmManager failed, falling back without exact delivery.', e);
+        trigger.alarmManager = false;
+        await notifee.createTriggerNotification(notificationPayload, trigger).catch(console.error);
+      }
     }
   }
 }

@@ -1,18 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, View, TextInput, ScrollView, Pressable, Modal, Animated, Keyboard, Platform } from 'react-native';
+import { StyleSheet, View, TextInput, ScrollView, Pressable, Modal, Animated as RNAnimated, Keyboard, Platform, Text } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useDuoStore, ChatMessage } from '@/store/duoStore';
 import { useAuthStore } from '@/store/authStore';
-import { Spacing } from '@/constants/theme';
+import { Spacing, Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useSettingsStore } from '@/store/settingsStore';
 
 export function ChatBox() {
   const [text, setText] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
   const { chatMessages, sendMessage, isChatEnabled, chatOnlyOnBreak, mode, isHost, toggleChat, toggleChatOnBreak } = useDuoStore();
   const { user, profile } = useAuthStore();
-  const { background, backgroundElement, text: textColor, primary, secondary } = useTheme();
+  const theme = useTheme();
+  const { background, backgroundElement, text: textColor, primary, secondary, destructive } = theme;
   const [showSettings, setShowSettings] = useState(false);
+  const isDarkMode = useSettingsStore(state => state.isDarkMode);
+  const solidBackground = isDarkMode ? '#222222' : '#f0f0f0';
 
   // Determine if chat is currently active
   const isChatActive = isChatEnabled && (!chatOnlyOnBreak || mode === 'break');
@@ -25,14 +30,14 @@ export function ChatBox() {
   }
 
   // Auto-scroll is handled by ScrollView's onContentSizeChange
-  const translateY = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new RNAnimated.Value(0)).current;
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
     const showSub = Keyboard.addListener(showEvent, (e) => {
-      Animated.timing(translateY, {
+      RNAnimated.timing(translateY, {
         toValue: -e.endCoordinates.height,
         duration: e.duration || 250,
         useNativeDriver: true,
@@ -40,7 +45,7 @@ export function ChatBox() {
     });
 
     const hideSub = Keyboard.addListener(hideEvent, (e) => {
-      Animated.timing(translateY, {
+      RNAnimated.timing(translateY, {
         toValue: 0,
         duration: e.duration || 250,
         useNativeDriver: true,
@@ -52,50 +57,45 @@ export function ChatBox() {
       hideSub.remove();
     };
   }, []);
+  const animatedSettingsStyle = useAnimatedStyle(() => {
+    return {
+      width: withTiming(showSettings ? 170 : 0, { duration: 300 }),
+      opacity: withTiming(showSettings ? 1 : 0, { duration: 300 }),
+    };
+  }, [showSettings]);
 
   return (
-    <Animated.View style={[styles.container, { backgroundColor: backgroundElement, transform: [{ translateY }] }]}>
+    <RNAnimated.View style={[styles.container, { backgroundColor: solidBackground, transform: [{ translateY }] }]}>
       <View style={styles.header}>
         <ThemedText style={{ color: textColor, fontWeight: 'bold' }}>
           💬 Chat
         </ThemedText>
         {isHost && (
-          <Pressable onPress={() => setShowSettings(true)} style={styles.settingsBtn}>
-            <ThemedText style={{ color: textColor, fontSize: 16 }}>⚙️</ThemedText>
-          </Pressable>
-        )}
-      </View>
-
-      <Modal visible={showSettings} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: background }]}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.three }}>
-              <ThemedText type="title" style={{ color: textColor, fontSize: 20 }}>Chat Settings</ThemedText>
-              <Pressable onPress={() => setShowSettings(false)}>
-                <ThemedText style={{ color: '#E74C3C', fontWeight: 'bold' }}>Close</ThemedText>
-              </Pressable>
-            </View>
-            <View style={{ gap: Spacing.three }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Animated.View style={[{ flexDirection: 'row', gap: Spacing.two, overflow: 'hidden' }, animatedSettingsStyle]}>
               <Pressable
-                style={[styles.settingChip, isChatEnabled ? { backgroundColor: primary } : { backgroundColor: secondary }]}
+                style={[styles.settingChip, isChatEnabled ? { backgroundColor: primary } : { backgroundColor: secondary }, { paddingHorizontal: Spacing.two, paddingVertical: 4, width: 75, height: 30, justifyContent: 'center' }]}
                 onPress={() => toggleChat(!isChatEnabled)}
               >
-                <ThemedText style={{ color: '#fff', fontSize: 14, textAlign: 'center' }}>
-                  {isChatEnabled ? '✅ Chat On' : '❌ Chat Off'}
+                <ThemedText style={{ color: '#fff', fontSize: 12, textAlign: 'center' }}>
+                  {isChatEnabled ? '✅ On' : '❌ Off'}
                 </ThemedText>
               </Pressable>
               <Pressable
-                style={[styles.settingChip, chatOnlyOnBreak ? { backgroundColor: primary } : { backgroundColor: secondary }]}
+                style={[styles.settingChip, chatOnlyOnBreak ? { backgroundColor: primary } : { backgroundColor: secondary }, { paddingHorizontal: Spacing.two, paddingVertical: 4, width: 85, height: 30, justifyContent: 'center' }]}
                 onPress={() => toggleChatOnBreak(!chatOnlyOnBreak)}
               >
-                <ThemedText style={{ color: '#fff', fontSize: 14, textAlign: 'center' }}>
-                  {chatOnlyOnBreak ? '☕ Break Only' : '💬 Anytime'}
+                <ThemedText style={{ color: '#fff', fontSize: 12, textAlign: 'center' }}>
+                  {chatOnlyOnBreak ? '☕ Break' : '💬 All'}
                 </ThemedText>
               </Pressable>
-            </View>
+            </Animated.View>
+            <Pressable onPress={() => setShowSettings(!showSettings)} style={[styles.settingsBtn, { marginLeft: Spacing.two }]}>
+              <ThemedText style={{ color: textColor, fontSize: 16 }}>⚙️</ThemedText>
+            </Pressable>
           </View>
-        </View>
-      </Modal>
+        )}
+      </View>
 
       {!isChatActive ? (
         <View style={styles.disabledContainer}>
@@ -122,13 +122,13 @@ export function ChatBox() {
                 return (
                   <View key={item.id} style={[styles.messageBubble, isMe ? { backgroundColor: primary, alignSelf: 'flex-end' } : { backgroundColor: secondary, alignSelf: 'flex-start' }]}>
                     {!isMe && (
-                      <ThemedText style={{ color: background, fontSize: 10, fontWeight: 'bold', marginBottom: 2 }}>
+                      <Text style={{ color: '#000', fontSize: 10, fontFamily: Fonts.sansBold, marginBottom: 2 }}>
                         {item.username}
-                      </ThemedText>
+                      </Text>
                     )}
-                    <ThemedText style={{ color: isMe ? background : '#fff', fontSize: 14 }}>
+                    <Text style={{ color: '#000', fontSize: 14, fontFamily: Fonts.sans }}>
                       {item.text}
-                    </ThemedText>
+                    </Text>
                   </View>
                 );
               })
@@ -151,7 +151,7 @@ export function ChatBox() {
           </View>
         </>
       )}
-    </Animated.View>
+    </RNAnimated.View>
   );
 }
 

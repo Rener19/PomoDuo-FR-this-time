@@ -52,6 +52,7 @@ interface DuoState {
 
   // Invites
   pendingInvites: SessionInvite[];
+  sentInvites: string[];
 
   // Realtime
   channel: RealtimeChannel | null;
@@ -63,6 +64,7 @@ interface DuoState {
   inviteMoreFriends: (hostId: string, friendIds: string[]) => Promise<void>;
   acceptInvite: (invite: SessionInvite, userId: string, username: string) => Promise<boolean>;
   declineInvite: (inviteId: string) => Promise<void>;
+  cancelSentInvite: (friendId: string) => Promise<void>;
   subscribeToInvites: (userId: string) => void;
   unsubscribeFromInvites: () => void;
 
@@ -142,10 +144,13 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
           },
         });
       }
-      set((state: DuoState) => ({
-        participants: [...state.participants.filter((p: any) => p.id !== payload.id), payload],
-        waitingForFriends: false,
-      }));
+      set((state: DuoState) => {
+        const newParticipants = [...state.participants.filter((p: any) => p.id !== payload.id), payload];
+        return {
+          participants: newParticipants,
+          waitingForFriends: newParticipants.length <= 1,
+        };
+      });
     })
     .on('broadcast', { event: 'participant_left' }, ({ payload }) => {
       set((state: DuoState) => ({
@@ -194,6 +199,7 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   isChatEnabled: true,
   chatOnlyOnBreak: false,
   pendingInvites: [],
+  sentInvites: [],
   channel: null,
   inviteChannel: null,
   completedFocusMinutes: 0,
@@ -225,11 +231,21 @@ export const useDuoStore = create<DuoState>((set, get) => ({
         'postgres_changes',
         { event: '*', schema: 'public', table: 'session_invites', filter: `inviter_id=eq.${userId}` },
         (payload) => {
-          // If someone accepted our invite, join the session channel if we haven't already
+          // Sync sent invites status
+          if (payload.eventType === 'UPDATE' && (payload.new as any).status !== 'pending') {
+            set((state) => ({ sentInvites: state.sentInvites.filter((id) => id !== (payload.new as any).invitee_id) }));
+          } else if (payload.eventType === 'DELETE') {
+            set((state) => ({ sentInvites: state.sentInvites.filter((id) => id !== (payload.old as any).invitee_id) }));
+          } else if (payload.eventType === 'INSERT') {
+            if (!get().sentInvites.includes((payload.new as any).invitee_id)) {
+              set((state) => ({ sentInvites: [...state.sentInvites, (payload.new as any).invitee_id] }));
+            }
+          }
+
+          // If someone accepted our invite, maybe reload things if needed
           if (payload.eventType === 'UPDATE' && (payload.new as any).status === 'accepted') {
             const state = get();
             if (state.waitingForFriends && state.sessionId) {
-              // Reload invites
               get().loadPendingInvites(userId);
             }
           }
@@ -307,6 +323,13 @@ export const useDuoStore = create<DuoState>((set, get) => ({
     if (error) console.error('Error inviting more friends:', error);
   },
 
+  cancelSentInvite: async (friendId: string) => {
+    const sessionId = get().sessionId;
+    if (!sessionId) return;
+    const { error } = await supabase.from('session_invites').delete().match({ session_id: sessionId, invitee_id: friendId });
+    if (error) console.error('Error canceling invite:', error);
+  },
+
   acceptInvite: async (invite, userId, username) => {
     // Update invite status
     const { error } = await supabase
@@ -334,8 +357,13 @@ export const useDuoStore = create<DuoState>((set, get) => ({
 
     if (!session) return false;
 
+    // If currently in another session, leave it first
+    if (get().sessionId) {
+      await get().leaveSession(userId);
+    }
+
     // Join the channel — default chat to enabled if columns don't exist
-    get().joinSessionChannel(
+    await get().joinSessionChannel(
       invite.session_id,
       userId,
       username,
@@ -400,9 +428,8 @@ export const useDuoStore = create<DuoState>((set, get) => ({
 
     setupChannel(channel, set, get);
 
-    // Ensure the host doesn't get stuck waiting for its own broadcast
     if (isHost) {
-      set({ waitingForFriends: true });
+      set({ waitingForFriends: participants.length <= 1 });
     }
 
     channel.subscribe(async (status) => {
@@ -412,11 +439,6 @@ export const useDuoStore = create<DuoState>((set, get) => ({
           event: 'participant_joined',
           payload: { id: userId, username },
         });
-        
-        // If we are the host, immediately consider ourselves joined so we don't get stuck
-        if (isHost) {
-          set({ waitingForFriends: false });
-        }
       }
     });
 
@@ -573,6 +595,11 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   setFocusTime: (minutes) => {
     const { mode, focusTime, timeLeft, savedFocusTimeLeft, channel } = get();
     const diffMinutes = minutes - focusTime;
+    if (diffMinutes < 0) {
+      if (mode === 'focus' && timeLeft < 60) return;
+      if (mode !== 'focus' && savedFocusTimeLeft !== null && savedFocusTimeLeft < 60) return;
+    }
+
     let newTimeLeft = timeLeft;
     let newSavedFocus = savedFocusTimeLeft;
 
@@ -597,6 +624,11 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   setBreakTime: (minutes) => {
     const { mode, breakTime, timeLeft, savedBreakTimeLeft, channel } = get();
     const diffMinutes = minutes - breakTime;
+    if (diffMinutes < 0) {
+      if (mode === 'break' && timeLeft < 60) return;
+      if (mode !== 'break' && savedBreakTimeLeft !== null && savedBreakTimeLeft < 60) return;
+    }
+
     let newTimeLeft = timeLeft;
     let newSavedBreak = savedBreakTimeLeft;
 
@@ -685,23 +717,34 @@ export const useDuoStore = create<DuoState>((set, get) => ({
         if (state.mode === 'focus') {
           const user = useAuthStore.getState().user;
           if (user) {
-            supabase.rpc('log_focus_time', {
-              user_id: user.id,
-              minutes_added: state.focusTime
-            }).then(({ error }) => {
+            (async () => {
+              const { error } = await supabase.rpc('log_focus_time', {
+                user_id: user.id,
+                minutes_added: state.focusTime
+              });
               if (error) console.error('Failed to log focus time:', error);
-            });
+            })();
           }
         }
 
         const nextMode = state.mode === 'focus' ? 'break' : 'focus';
         const nextTimeLeft = nextMode === 'focus' ? state.focusTime * 60 : state.breakTime * 60;
         
+        const newTargetEndTime = state.targetEndTime + nextTimeLeft * 1000;
+        
+        if (state.isHost && state.channel) {
+          state.channel.send({
+            type: 'broadcast',
+            event: 'timer_sync',
+            payload: { timeLeft: nextTimeLeft, mode: nextMode, isRunning: true, targetEndTime: newTargetEndTime, focusTime: state.focusTime, breakTime: state.breakTime },
+          });
+        }
+
         return { 
           mode: nextMode, 
           timeLeft: nextTimeLeft, 
           isRunning: true, 
-          targetEndTime: Date.now() + nextTimeLeft * 1000,
+          targetEndTime: newTargetEndTime,
           savedFocusTimeLeft: nextMode === 'focus' ? null : state.savedFocusTimeLeft,
           savedBreakTimeLeft: nextMode === 'break' ? null : state.savedBreakTimeLeft,
           completedFocusMinutes: state.mode === 'focus' ? state.completedFocusMinutes + state.focusTime : state.completedFocusMinutes,
@@ -723,20 +766,33 @@ export const useDuoStore = create<DuoState>((set, get) => ({
         if (state.mode === 'focus') {
           const user = useAuthStore.getState().user;
           if (user) {
-            supabase.rpc('log_focus_time', {
-              user_id: user.id,
-              minutes_added: state.focusTime
-            }).catch(e => console.error(e));
+            (async () => {
+              const { error } = await supabase.rpc('log_focus_time', {
+                user_id: user.id,
+                minutes_added: state.focusTime
+              });
+              if (error) console.error(error);
+            })();
           }
         }
 
         const nextMode = state.mode === 'focus' ? 'break' : 'focus';
         const nextTimeLeft = nextMode === 'focus' ? state.focusTime * 60 : state.breakTime * 60;
+        const newTargetEndTime = state.targetEndTime + nextTimeLeft * 1000;
+        
+        if (state.isHost && state.channel) {
+          state.channel.send({
+            type: 'broadcast',
+            event: 'timer_sync',
+            payload: { timeLeft: nextTimeLeft, mode: nextMode, isRunning: true, targetEndTime: newTargetEndTime, focusTime: state.focusTime, breakTime: state.breakTime },
+          });
+        }
+
         return { 
           mode: nextMode, 
           timeLeft: nextTimeLeft, 
           isRunning: true, 
-          targetEndTime: Date.now() + nextTimeLeft * 1000,
+          targetEndTime: newTargetEndTime,
           savedFocusTimeLeft: nextMode === 'focus' ? null : state.savedFocusTimeLeft,
           savedBreakTimeLeft: nextMode === 'break' ? null : state.savedBreakTimeLeft,
           completedFocusMinutes: state.mode === 'focus' ? state.completedFocusMinutes + state.focusTime : state.completedFocusMinutes,
