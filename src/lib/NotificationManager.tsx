@@ -56,11 +56,6 @@ export function NotificationManager() {
           const timerEndedNaturally = Date.now() >= oldTargetEnd - 2000;
 
           if (timerEndedNaturally) {
-            // Delay the alarm slightly to allow the full 1000ms UI ring animation to finish smoothly without dropping frames!
-            setTimeout(() => {
-              triggerImmediateAlarm(ringingMode);
-            }, 1050);
-            
             // Let the alarm ring fully, then clear it from the notification tray after 8 seconds
             setTimeout(() => {
               clearAlarmNotification(ringingMode);
@@ -73,8 +68,8 @@ export function NotificationManager() {
           } else {
             // User manually skipped the timer or joined a session!
             // Delay the heavy Notifee bridge calls until after the UI transition finishes
-            setTimeout(() => {
-              clearAlarmNotification(ringingMode);
+            setTimeout(async () => {
+              await clearAlarmNotification(ringingMode);
               startForegroundService(activeTimer.mode, activeTimer.timeLeft, activeTimer.targetEndTime);
             }, 1050);
           }
