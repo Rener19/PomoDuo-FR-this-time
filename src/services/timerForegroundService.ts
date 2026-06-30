@@ -6,7 +6,7 @@ let isServiceRunning = false;
 let serviceChannelId: string | null = null;
 let alarmChannelSoundId: string | null = null;
 let alarmChannelSilentId: string | null = null;
-let stopServiceCallback: ((value?: unknown) => void) | null = null;
+let stopServiceCallback: ((value?: any) => void) | null = null;
 
 const formatEndTime = (timeLeftSeconds: number) => {
   const endTime = new Date(Date.now() + timeLeftSeconds * 1000);
@@ -64,8 +64,10 @@ export async function updateTimerNotification(mode: string, timeLeft: number, is
 
   if (!isRunning) {
     // Stop the alarm if paused
-    await notifee.cancelNotification(`timer-end-${mode}`);
-    await notifee.cancelTriggerNotification(`timer-end-${mode}`);
+    await notifee.cancelNotification('timer-end-focus');
+    await notifee.cancelTriggerNotification('timer-end-focus');
+    await notifee.cancelNotification('timer-end-break');
+    await notifee.cancelTriggerNotification('timer-end-break');
     
     if (isServiceRunning) {
       await notifee.displayNotification({
@@ -133,8 +135,7 @@ export async function updateTimerNotification(mode: string, timeLeft: number, is
           category: AndroidCategory.ALARM,
         },
         ios: {
-          sound: 'default',
-          interruptionLevel: 'timeSensitive',
+          categoryId: 'pomoduo_timer',
         },
       };
 
@@ -151,8 +152,34 @@ export async function updateTimerNotification(mode: string, timeLeft: number, is
 }
 
 export async function clearAlarmNotification(mode: string) {
-  await notifee.cancelNotification(`timer-end-${mode}`);
+  await notifee.cancelNotification('timer-end-focus');
+  await notifee.cancelTriggerNotification('timer-end-focus');
+  await notifee.cancelNotification('timer-end-break');
+  await notifee.cancelTriggerNotification('timer-end-break');
 }
+
+export async function triggerImmediateAlarm(mode: string) {
+  if (!alarmChannelSoundId) return;
+  const { soundEnabled } = useSettingsStore.getState();
+  if (!soundEnabled) return;
+
+  await notifee.displayNotification({
+    id: `timer-end-${mode}`,
+    title: `Time's up!`,
+    body: `Your ${mode} session has ended.`,
+    android: {
+      channelId: alarmChannelSoundId,
+      smallIcon: 'ic_launcher',
+      importance: AndroidImportance.HIGH,
+      pressAction: { id: 'default' },
+      category: AndroidCategory.ALARM,
+    },
+    ios: {
+      categoryId: 'pomoduo_timer',
+    },
+  });
+}
+
 
 export async function stopForegroundService() {
   isServiceRunning = false;

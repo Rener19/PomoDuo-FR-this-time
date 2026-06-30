@@ -26,7 +26,9 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
     tick, syncFromBackground, isChatEnabled, chatOnlyOnBreak,
     focusTime, breakTime, setFocusTime, setBreakTime, inviteMoreFriends,
     sessionStartTime, completedFocusMinutes, completedBreakMinutes,
-    waitingForFriends
+    waitingForFriends, sentInvites, cancelSentInvite,
+    kickedToastMessage, clearKickedToast, kickParticipant,
+    hasReceivedInitialSync
   } = useDuoStore();
   const { user } = useAuthStore();
   const theme = useTheme();
@@ -36,40 +38,7 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [friends, setFriends] = useState<any[]>([]);
 
-  // Toast state
-  const prevParticipantsRef = useRef(participants);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const toastOpacity = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    // Check if new participants joined
-    if (participants.length > prevParticipantsRef.current.length) {
-      const newParticipant = participants[participants.length - 1];
-      // Exclude self from toast (when creating session)
-      if (newParticipant && newParticipant.id !== user?.id) {
-        showToast(`${newParticipant.username} joined the session! 👋`);
-      }
-    }
-    // Check if someone left
-    if (participants.length < prevParticipantsRef.current.length) {
-      const left = prevParticipantsRef.current.find(p => !participants.some(np => np.id === p.id));
-      if (left && left.id !== user?.id) {
-        showToast(`${left.username} left the session.`);
-      }
-    }
-    prevParticipantsRef.current = participants;
-  }, [participants]);
-
-  function showToast(message: string) {
-    setToastMessage(message);
-    Animated.sequence([
-      Animated.timing(toastOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-      Animated.delay(3000),
-      Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true })
-    ]).start(() => {
-      setToastMessage(null);
-    });
-  }
+  // Toast logic moved to global ToastManager
 
   useEffect(() => {
     if (showInviteModal && user) loadFriends();
@@ -98,7 +67,7 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
   }
 
   async function handleCancelInvite(friendId: string) {
-    await duoState.cancelSentInvite(friendId);
+    await cancelSentInvite(friendId);
   }
 
   useEffect(() => {
@@ -132,6 +101,22 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
   const totalFocus = completedFocusMinutes + currentElapsedFocus;
   const totalBreak = completedBreakMinutes + currentElapsedBreak;
 
+  if (!hasReceivedInitialSync) {
+    return (
+      <ThemedView style={[styles.container, { backgroundColor: background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ThemedText style={{ color: textColor, fontFamily: Fonts.sansBold, fontSize: 18, marginBottom: Spacing.four }}>
+          Connecting to session...
+        </ThemedText>
+        <Pressable 
+          style={{ paddingHorizontal: 20, paddingVertical: 10, backgroundColor: destructive, borderRadius: 20 }} 
+          onPress={handleLeave}
+        >
+          <ThemedText style={{ color: '#fff', fontFamily: Fonts.sansBold }}>Cancel</ThemedText>
+        </Pressable>
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={[styles.container, { backgroundColor: background }]}>
       <SafeAreaView style={styles.safeArea}>
@@ -146,8 +131,12 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
             <ThemedText type="title" style={[styles.title, { color: primary }]}>
               PomoDuo
             </ThemedText>
-            <Pressable onPress={() => setShowMenu(true)}>
-              <ThemedText style={{ color: textColor, fontSize: 24 }}>☰</ThemedText>
+            <Pressable 
+              onPress={() => setShowMenu(true)}
+              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+              style={{ padding: 10, zIndex: 10 }}
+            >
+              <ThemedText style={{ color: textColor, fontSize: 28 }}>☰</ThemedText>
             </Pressable>
           </View>
 
@@ -267,11 +256,21 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
               </ThemedText>
               <View style={{ gap: Spacing.one }}>
                 {participants.map(p => (
-                  <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: success }} />
-                    <ThemedText style={{ color: textColor }}>
-                      {p.username} {p.id === hostId ? '👑' : ''}
-                    </ThemedText>
+                  <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, paddingVertical: Spacing.one }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: success }} />
+                      <ThemedText style={{ color: textColor }}>
+                        {p.username} {p.id === hostId ? '👑' : ''}
+                      </ThemedText>
+                    </View>
+                    {isHost && p.id !== user?.id && (
+                      <Pressable 
+                        style={{ paddingHorizontal: 12, paddingVertical: 4, backgroundColor: destructive, borderRadius: 12 }} 
+                        onPress={() => { setShowMenu(false); kickParticipant(p.id, p.username); }}
+                      >
+                        <ThemedText style={{ color: '#fff', fontSize: 12, fontFamily: Fonts.sansBold }}>Kick</ThemedText>
+                      </Pressable>
+                    )}
                   </View>
                 ))}
               </View>
@@ -315,7 +314,7 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
                   friends.map((item) => {
                     const friend = item.user_id === user?.id ? item.u2 : item.u1;
                     if (!friend) return null;
-                    const isInvited = duoState.sentInvites.includes(friend.id);
+                    const isInvited = (sentInvites || []).includes(friend.id);
                     return (
                       <ThemedView key={friend.id} type="backgroundElement" style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.two, borderRadius: Spacing.two, marginBottom: Spacing.two }]}>
                         <ThemedText themeColor="text" style={{ fontFamily: Fonts.sansBold, flex: 1 }}>
@@ -339,15 +338,6 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
             </View>
           </View>
         </Modal>
-        
-        {/* Toast Notification */}
-        {toastMessage && (
-          <Animated.View style={[styles.toastContainer, { opacity: toastOpacity }]}>
-            <View style={[styles.toastContent, { backgroundColor: success }]}>
-              <ThemedText style={{ color: '#fff', fontFamily: Fonts.sansBold }}>{toastMessage}</ThemedText>
-            </View>
-          </Animated.View>
-        )}
       </SafeAreaView>
     </ThemedView>
   );
@@ -456,23 +446,5 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     borderRadius: Spacing.two,
     marginBottom: Spacing.two,
-  },
-  toastContainer: {
-    position: 'absolute',
-    bottom: 100,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 200,
-  },
-  toastContent: {
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: 20,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
 });

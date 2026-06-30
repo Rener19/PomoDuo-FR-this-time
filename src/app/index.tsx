@@ -65,6 +65,11 @@ export default function HomeScreen() {
     }
   }, [showInviteModal]);
 
+  // Close the invite modal automatically when entering or leaving a session
+  useEffect(() => {
+    setShowInviteModal(false);
+  }, [duo.sessionId]);
+
   async function loadFriends() {
     const { data } = await supabase
       .from('friends')
@@ -143,8 +148,6 @@ export default function HomeScreen() {
               ))}
             </ThemedView>
           )}
-
-
         </View>
 
         <ThemedText type="title" themeColor="primary" style={styles.title}>
@@ -238,7 +241,7 @@ export default function HomeScreen() {
                   friends.map((item) => {
                     const friend = item.user_id === user?.id ? item.u2 : item.u1;
                     if (!friend) return null;
-                    const isInvited = duo.sentInvites.includes(friend.id);
+                    const isInvited = (duo.sentInvites || []).includes(friend.id);
                     return (
                       <ThemedView key={friend.id} type="backgroundElement" style={[styles.friendRow, { paddingVertical: Spacing.two }]}>
                         <ThemedText themeColor="text" style={{ fontFamily: Fonts.sansBold, flex: 1 }}>

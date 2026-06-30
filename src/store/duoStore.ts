@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from './authStore';
+import { useTimerStore } from './timerStore';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { AppState } from 'react-native';
 import notifee, { AndroidImportance } from 'react-native-notify-kit';
@@ -34,6 +35,14 @@ interface DuoState {
   sessionStartTime: number | null;
   completedFocusMinutes: number;
   completedBreakMinutes: number;
+  kickedModalVisible: boolean;
+  kickedUserIds: string[];
+  hasReceivedInitialSync: boolean;
+  
+  // Actions
+  setKickedModalVisible: (visible: boolean) => void;
+  kickParticipant: (userId: string, username: string) => void;
+
 
   // Timer (synced via Realtime)
   focusTime: number;
@@ -130,6 +139,24 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
       });
     })
     .on('broadcast', { event: 'participant_joined' }, ({ payload }) => {
+      const currentState = get();
+      
+      // If the host was using the solo timer while waiting for friends, sync the latest solo timer state to the duo session!
+      if (currentState.isHost && currentState.waitingForFriends) {
+        const soloState = useTimerStore.getState();
+        set({
+          timeLeft: soloState.timeLeft,
+          mode: soloState.mode,
+          isRunning: soloState.isRunning,
+          targetEndTime: soloState.targetEndTime,
+          focusTime: soloState.totalFocusTime,
+          breakTime: soloState.breakTime,
+        });
+      } else if (currentState.isHost && currentState.isRunning && currentState.targetEndTime) {
+        // Otherwise just update our background timer
+        get().syncFromBackground();
+      }
+
       const state = get();
       if (state.isHost && state.channel) {
         state.channel.send({
@@ -139,23 +166,61 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
             timeLeft: state.timeLeft,
             mode: state.mode,
             isRunning: state.isRunning,
+            targetEndTime: state.targetEndTime,
             focusTime: state.focusTime,
             breakTime: state.breakTime,
           },
         });
       }
+
       set((state: DuoState) => {
         const newParticipants = [...state.participants.filter((p: any) => p.id !== payload.id), payload];
         return {
           participants: newParticipants,
-          waitingForFriends: newParticipants.length <= 1,
+          kickedUserIds: state.kickedUserIds.filter(id => id !== payload.id),
+          waitingForFriends: state.isHost ? newParticipants.length <= 1 : state.waitingForFriends,
         };
       });
     })
     .on('broadcast', { event: 'participant_left' }, ({ payload }) => {
-      set((state: DuoState) => ({
-        participants: state.participants.filter((p: any) => p.id !== payload.id),
-      }));
+      set((state: DuoState) => {
+        const newParticipants = state.participants.filter((p: any) => p.id !== payload.id);
+        const shouldWait = newParticipants.length <= 1;
+        
+        // If host is the only one left, transition back to solo mode
+        if (state.isHost && shouldWait && !state.waitingForFriends) {
+           useTimerStore.setState({
+             timeLeft: state.timeLeft,
+             mode: state.mode,
+             isRunning: state.isRunning,
+             targetEndTime: state.targetEndTime
+           });
+        }
+        
+        return {
+          participants: newParticipants,
+          waitingForFriends: state.isHost ? shouldWait : state.waitingForFriends,
+        };
+      });
+    })
+    .on('broadcast', { event: 'kick_user' }, ({ payload }) => {
+      const { id: kickedUserId, username: kickedUsername } = payload;
+      const currentUser = useAuthStore.getState().user;
+      
+      if (currentUser?.id === kickedUserId) {
+        // I am the one kicked
+        useTimerStore.setState({
+           timeLeft: get().timeLeft,
+           mode: get().mode,
+           isRunning: get().isRunning,
+           targetEndTime: get().targetEndTime
+        });
+        get().setKickedModalVisible(true);
+        get().leaveSession(currentUser.id);
+      } else {
+        // Someone else was kicked
+        set(s => ({ kickedUserIds: [...s.kickedUserIds, kickedUserId] }));
+      }
     })
     .on('broadcast', { event: 'timer_sync' }, ({ payload }) => {
       // The host is the source of truth and already updated local state before broadcasting.
@@ -173,8 +238,9 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
         mode: payload.mode,
         isRunning: payload.isRunning,
         targetEndTime: localTargetEndTime,
-        ...(payload.focusTime !== undefined && { focusTime: payload.focusTime }),
-        ...(payload.breakTime !== undefined && { breakTime: payload.breakTime }),
+        focusTime: payload.focusTime,
+        breakTime: payload.breakTime,
+        hasReceivedInitialSync: true,
       });
     })
     .on('broadcast', { event: 'chat_settings' }, ({ payload }) => {
@@ -208,6 +274,23 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   inviteChannel: null,
   completedFocusMinutes: 0,
   completedBreakMinutes: 0,
+  sessionStartTime: null,
+  kickedModalVisible: false,
+  kickedUserIds: [],
+  hasReceivedInitialSync: false,
+
+  setKickedModalVisible: (visible) => set({ kickedModalVisible: visible }),
+  kickParticipant: (userId: string, username: string) => {
+    const state = get();
+    if (state.isHost && state.channel) {
+      state.channel.send({
+        type: 'broadcast',
+        event: 'kick_user',
+        payload: { id: userId, username },
+      });
+      set(s => ({ kickedUserIds: [...s.kickedUserIds, userId] }));
+    }
+  },
 
   // ─── Invites ────────────────────────────────────────────────
 
@@ -451,6 +534,32 @@ export const useDuoStore = create<DuoState>((set, get) => ({
       set({ waitingForFriends: participants.length <= 1 });
     }
 
+    set({
+      sessionId,
+      hostId: isHost ? userId : get().hostId,
+      isHost: isHost,
+      participants,
+      focusTime: focusMin,
+      breakTime: breakMin,
+      mode: initialMode,
+      timeLeft: initialTimeLeft !== undefined ? initialTimeLeft : focusMin * 60,
+      isRunning: initialIsRunning,
+      targetEndTime: initialIsRunning ? Date.now() + (initialTimeLeft !== undefined ? initialTimeLeft : focusMin * 60) * 1000 : null,
+      isChatEnabled: chatEnabled ?? true,
+      chatOnlyOnBreak: chatOnBreak ?? false,
+      channel,
+      chatMessages: [],
+      sessionStartTime: Date.now(),
+      completedFocusMinutes: 0,
+      completedBreakMinutes: 0,
+      hasReceivedInitialSync: isHost,
+      kickedUserIds: [],
+    });
+    
+    // Clear any pending triggers from solo mode to prevent rogue alarms
+    notifee.cancelTriggerNotification('timer-end-focus');
+    notifee.cancelTriggerNotification('timer-end-break');
+
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         channel.send({
@@ -468,36 +577,16 @@ export const useDuoStore = create<DuoState>((set, get) => ({
       .eq('session_id', sessionId)
       .order('timestamp', { ascending: true });
 
-    let initialMessages: ChatMessage[] = [];
-    if (messages) {
-      initialMessages = messages.map((m: any) => ({
+    if (messages && messages.length > 0) {
+      const initialMessages = messages.map((m: any) => ({
         id: m.id,
         userId: m.user_id,
         username: m.username,
         text: m.text,
         timestamp: m.timestamp,
       }));
+      set({ chatMessages: initialMessages });
     }
-
-    set({
-      sessionId,
-      hostId: isHost ? userId : get().hostId,
-      isHost: isHost,
-      participants,
-      focusTime: focusMin,
-      breakTime: breakMin,
-      mode: initialMode,
-      timeLeft: initialTimeLeft !== undefined ? initialTimeLeft : focusMin * 60,
-      isRunning: initialIsRunning,
-      targetEndTime: initialIsRunning ? Date.now() + (initialTimeLeft !== undefined ? initialTimeLeft : focusMin * 60) * 1000 : null,
-      isChatEnabled: chatEnabled ?? true,
-      chatOnlyOnBreak: chatOnBreak ?? false,
-      channel,
-      chatMessages: initialMessages,
-      sessionStartTime: Date.now(),
-      completedFocusMinutes: 0,
-      completedBreakMinutes: 0,
-    });
   },
 
   leaveSession: async (userId) => {
@@ -531,6 +620,13 @@ export const useDuoStore = create<DuoState>((set, get) => ({
     }
 
     if (sessionId) {
+      // Sync the timer to the solo mode before leaving so it continues seamlessly
+      useTimerStore.setState({
+         timeLeft: get().timeLeft,
+         mode: get().mode,
+         isRunning: get().isRunning,
+         targetEndTime: get().targetEndTime
+      });
       await supabase.from('session_participants').delete().match({ session_id: sessionId, user_id: userId });
     }
 
@@ -548,7 +644,13 @@ export const useDuoStore = create<DuoState>((set, get) => ({
       timeLeft: 25 * 60,
       mode: 'focus',
       waitingForFriends: false,
+      kickedUserIds: [],
+      hasReceivedInitialSync: false,
     });
+    
+    // Clear any pending triggers from the session
+    notifee.cancelTriggerNotification('timer-end-focus');
+    notifee.cancelTriggerNotification('timer-end-break');
   },
 
   // ─── Timer Controls (host only, broadcast to all) ───────────

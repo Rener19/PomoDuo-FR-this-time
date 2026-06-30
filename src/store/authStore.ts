@@ -11,6 +11,7 @@ interface AuthState {
   ensureProfile: (user: User | null) => Promise<void>;
   initialize: () => void;
   signOut: () => Promise<void>;
+  updateProfile: (profile: { id: string; username: string } | null) => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -70,5 +71,5 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ session: null, user: null, profile: null });
   },
   
-  updateProfile: (profile) => set({ profile }),
+  updateProfile: (profile: { id: string; username: string } | null) => set({ profile }),
 }));

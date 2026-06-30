@@ -26,7 +26,7 @@ export async function showTimerNotification(title: string, body: string, targetE
       color: '#208AEF',
       ongoing: true,
       onlyAlertOnce: true,
-      usesChronometer: true,
+      showChronometer: true,
       chronometerDirection: 'down',
       timestamp: targetEndTime,
     },

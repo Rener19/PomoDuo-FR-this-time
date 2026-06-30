@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { useDuoStore } from '@/store/duoStore';
 import { useTimerStore } from '@/store/timerStore';
+import { router } from 'expo-router';
 
 export default function FriendsScreen() {
   const theme = useTheme();
@@ -148,7 +149,11 @@ export default function FriendsScreen() {
     if (!user || !profile) return;
     const username = profile.username || 'User';
     const success = await acceptInvite(invite, user.id, username);
-    if (!success) Alert.alert('Error', 'Could not join session.');
+    if (success) {
+      router.navigate('/');
+    } else {
+      Alert.alert('Error', 'Could not join session.');
+    }
   }
 
   // ─── Requests Overlay ──────────────────────────────────────

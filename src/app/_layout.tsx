@@ -18,6 +18,7 @@ import { AuthScreen } from '@/components/AuthScreen';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
 import { NotificationManager } from '@/lib/NotificationManager';
+import { ToastManager } from '@/components/ToastManager';
 
 // MUST be at the module level so it runs before any component mounts.
 // This completes any pending auth sessions from a previous app launch.
@@ -61,6 +62,7 @@ export default function TabLayout() {
   return (
     <ThemeProvider value={isDarkMode ? DarkTheme : DefaultTheme}>
       <NotificationManager />
+      <ToastManager />
       <AnimatedSplashOverlay />
       {session ? <AppTabs /> : <AuthScreen />}
     </ThemeProvider>
