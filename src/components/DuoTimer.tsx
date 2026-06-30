@@ -128,7 +128,7 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
         >
           {/* Header */}
           <View style={styles.header}>
-            <ThemedText type="title" style={[styles.title, { color: primary }]}>
+            <ThemedText type="title" themeColor="primary" style={styles.title}>
               PomoDuo
             </ThemedText>
             <Pressable 

@@ -173,6 +173,7 @@ export async function triggerImmediateAlarm(mode: string) {
       importance: AndroidImportance.HIGH,
       pressAction: { id: 'default' },
       category: AndroidCategory.ALARM,
+      onlyAlertOnce: true,
     },
     ios: {
       categoryId: 'pomoduo_timer',

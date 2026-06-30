@@ -1,4 +1,6 @@
-import { Platform, StyleSheet, Text, TextProps } from 'react-native';
+import { Platform, StyleSheet, TextProps } from 'react-native';
+import React, { useState } from 'react';
+import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useIsFocused } from 'expo-router';
 
 import { Fonts, ThemeColor } from '@/constants/theme';
@@ -11,13 +13,28 @@ export type ThemedTextProps = TextProps & {
 
 export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
   const theme = useTheme();
-  const textColor = theme[themeColor ?? 'text'];
   const isFocused = useIsFocused();
+  
+  const flatStyle = StyleSheet.flatten(style) || {};
+  const hasExplicitColor = flatStyle.color !== undefined;
+  const textColor = theme[themeColor ?? 'text'];
+
+  // Store the initial color to prevent Reanimated from reading unparseable Android native defaults
+  const [initialColor] = useState(textColor);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    if (hasExplicitColor) {
+      return {};
+    }
+    return {
+      color: withTiming(textColor, { duration: isFocused ? 500 : 0 }),
+    };
+  }, [textColor, isFocused, hasExplicitColor]);
 
   return (
-    <Text
+    <Animated.Text
       style={[
-        { color: textColor },
+        { color: initialColor },
         type === 'default' && styles.default,
         type === 'title' && styles.title,
         type === 'small' && styles.small,
@@ -27,6 +44,7 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
         type === 'linkPrimary' && styles.linkPrimary,
         type === 'code' && styles.code,
         style,
+        !hasExplicitColor && animatedStyle,
       ]}
       {...rest}
     />

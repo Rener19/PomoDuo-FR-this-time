@@ -56,6 +56,11 @@ export function NotificationManager() {
           const timerEndedNaturally = Date.now() >= oldTargetEnd - 2000;
 
           if (timerEndedNaturally) {
+            // Delay the alarm slightly to allow the full 1000ms UI ring animation to finish smoothly without dropping frames
+            setTimeout(() => {
+              triggerImmediateAlarm(ringingMode);
+            }, 1050);
+
             // Let the alarm ring fully, then clear it from the notification tray after 8 seconds
             setTimeout(() => {
               clearAlarmNotification(ringingMode);

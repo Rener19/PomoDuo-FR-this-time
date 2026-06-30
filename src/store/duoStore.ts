@@ -853,7 +853,7 @@ export const useDuoStore = create<DuoState>((set, get) => ({
         const nextMode = state.mode === 'focus' ? 'break' : 'focus';
         const nextTimeLeft = nextMode === 'focus' ? state.focusTime * 60 : state.breakTime * 60;
         
-        const newTargetEndTime = state.targetEndTime + nextTimeLeft * 1000;
+        const newTargetEndTime = Date.now() + nextTimeLeft * 1000;
         
         if (state.isHost && state.channel) {
           state.channel.send({
