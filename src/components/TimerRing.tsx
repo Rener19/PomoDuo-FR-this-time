@@ -150,9 +150,12 @@ export function TimerRing({ size = defaultSize, strokeWidth = 8 }) {
           {mode === 'focus' ? 'Focus' : 'Break'}
         </Animated.Text>
         {isRunning && targetEndTime && (
-          <Animated.Text style={[styles.endTimeText, animatedTextStyle, { opacity: 0.8 }]}>
+          <Text style={[
+            styles.endTimeText, 
+            { color: isFocus ? focusColors.timerProgress : breakColors.timerProgress, opacity: 0.8 }
+          ]}>
             🔔 Ends at {getEndTimeText()}
-          </Animated.Text>
+          </Text>
         )}
       </View>
     </View>

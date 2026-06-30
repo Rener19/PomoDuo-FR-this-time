@@ -1,4 +1,4 @@
-import { LogBox } from 'react-native';
+import { LogBox, UIManager, Platform } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useEffect } from 'react';
@@ -7,6 +7,10 @@ import * as WebBrowser from 'expo-web-browser';
 import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
 import { Literata_400Regular, Literata_500Medium, Literata_600SemiBold, Literata_700Bold } from '@expo-google-fonts/literata';
 LogBox.ignoreLogs(['new NativeEventEmitter']);
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';

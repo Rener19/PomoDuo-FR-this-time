@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, TextInput, Pressable, Alert, ScrollView } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { StyleSheet, View, TextInput, Pressable, Alert, ScrollView, Modal, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -18,12 +18,28 @@ export default function FriendsScreen() {
 
   const [showRequests, setShowRequests] = useState(false);
   const [requestsTab, setRequestsTab] = useState<'received' | 'sent'>('received');
+  const [friendToRemove, setFriendToRemove] = useState<{ id: string; username: string } | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [friends, setFriends] = useState<any[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [sentRequests, setSentRequests] = useState<any[]>([]);
+
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    toastOpacity.setValue(0);
+    Animated.sequence([
+      Animated.timing(toastOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.delay(3000),
+      Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true })
+    ]).start(() => {
+      setToastMessage(null);
+    });
+  };
 
   const loadAll = useCallback(() => {
     if (!user) return;
@@ -94,12 +110,17 @@ export default function FriendsScreen() {
     return { type: 'add' as const, requestId: null };
   }
 
-  async function sendFriendRequest(friendId: string) {
+  async function sendFriendRequest(friendId: string, username: string) {
     const { error } = await supabase
       .from('friends')
       .insert({ user_id: user?.id, friend_id: friendId, status: 'pending' });
     if (error) Alert.alert('Error', error.message);
-    else { Alert.alert('Success', 'Friend request sent!'); setSearchResults([]); setSearchQuery(''); loadSentRequests(); }
+    else { 
+      showToast(`Request to ${username} sent`); 
+      setSearchResults([]); 
+      setSearchQuery(''); 
+      loadSentRequests(); 
+    }
   }
 
   async function acceptFriendRequest(requestId: string) {
@@ -118,10 +139,9 @@ export default function FriendsScreen() {
   }
 
   async function removeFriend(friendshipId: string) {
-    Alert.alert('Remove Friend', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: async () => { await supabase.from('friends').delete().eq('id', friendshipId); loadFriends(); } },
-    ]);
+    await supabase.from('friends').delete().eq('id', friendshipId);
+    setFriendToRemove(null);
+    loadFriends();
   }
 
   async function handleAcceptSessionInvite(invite: any) {
@@ -258,7 +278,7 @@ export default function FriendsScreen() {
                   <View key={u.id} style={[styles.row, { backgroundColor: backgroundElement }]}>
                     <ThemedText style={{ color: text }}>{u.username}</ThemedText>
                     {action.type === 'add' && (
-                      <Pressable style={[styles.btnSmall, { backgroundColor: secondary }]} onPress={() => sendFriendRequest(u.id)}>
+                      <Pressable style={[styles.btnSmall, { backgroundColor: secondary }]} onPress={() => sendFriendRequest(u.id, u.username)}>
                         <ThemedText style={styles.btnText}>Add</ThemedText>
                       </Pressable>
                     )}
@@ -315,7 +335,7 @@ export default function FriendsScreen() {
               regularFriends.map((item) => (
                 <View key={item.id} style={[styles.row, { backgroundColor: backgroundElement }]}>
                   <ThemedText style={{ color: text, fontFamily: Fonts.sansBold }}>{item._friend.username}</ThemedText>
-                  <Pressable style={[styles.btnSmall, { backgroundColor: destructive }]} onPress={() => removeFriend(item.id)}>
+                  <Pressable style={[styles.btnSmall, { backgroundColor: destructive }]} onPress={() => setFriendToRemove({ id: item.id, username: item._friend.username })}>
                     <ThemedText style={styles.btnText}>Remove</ThemedText>
                   </Pressable>
                 </View>
@@ -325,6 +345,42 @@ export default function FriendsScreen() {
         </ScrollView>
         </View>
       </SafeAreaView>
+
+      {/* Remove Friend Modal */}
+      <Modal visible={!!friendToRemove} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: background }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.three }}>
+              <ThemedText type="title" style={{ color: text, fontSize: 22, fontFamily: Fonts.serifBold }}>Remove Friend</ThemedText>
+              <Pressable onPress={() => setFriendToRemove(null)}>
+                <ThemedText style={{ color: secondary, fontFamily: Fonts.sansBold, fontSize: 16 }}>Cancel</ThemedText>
+              </Pressable>
+            </View>
+
+            <ThemedText style={{ color: text, fontFamily: Fonts.sans, marginBottom: Spacing.four, fontSize: 16 }}>
+              Are you sure you want to remove <ThemedText style={{ fontFamily: Fonts.sansBold }}>{friendToRemove?.username}</ThemedText> from your friends list?
+            </ThemedText>
+
+            <Pressable 
+              style={{ backgroundColor: destructive, paddingVertical: Spacing.three, borderRadius: Spacing.three, alignItems: 'center' }} 
+              onPress={() => { if (friendToRemove) removeFriend(friendToRemove.id); }}
+            >
+              <ThemedText style={{ color: '#fff', fontFamily: Fonts.sansBold, fontSize: 16 }}>
+                Yes, Remove
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Toast Notification */}
+      {!!toastMessage && (
+        <Animated.View style={[styles.toastContainer, { opacity: toastOpacity }]} pointerEvents="none">
+          <View style={[styles.toastContent, { backgroundColor: primary }]}>
+            <ThemedText style={{ color: '#fff', fontFamily: Fonts.sansBold }}>{toastMessage}</ThemedText>
+          </View>
+        </Animated.View>
+      )}
     </ThemedView>
   );
 }
@@ -362,6 +418,35 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: Spacing.four,
+    paddingBottom: Spacing.six,
+  },
+  toastContainer: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 200,
+  },
+  toastContent: {
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.two,
+    borderRadius: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
     shadowRadius: 4,
   },
 });

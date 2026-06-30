@@ -80,13 +80,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   },
 
   start: () => {
-    set((state) => {
-      if (state.isRunning) return state;
-      return {
-        isRunning: true,
-        targetEndTime: Date.now() + state.timeLeft * 1000,
-      };
-    });
+    set({ isRunning: true, targetEndTime: Date.now() + get().timeLeft * 1000 });
   },
 
   pause: () => {

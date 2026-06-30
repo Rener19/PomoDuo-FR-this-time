@@ -362,6 +362,7 @@ const styles = StyleSheet.create({
     maxWidth: 600,
   },
   scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.six,
     alignItems: 'center',
@@ -390,6 +391,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   timerSection: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: Spacing.four,

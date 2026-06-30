@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Pressable, Modal, ScrollView, Alert, AppState } from 'react-native';
+import { StyleSheet, View, Pressable, Modal, ScrollView, Alert, AppState, LayoutAnimation } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TimerRing } from '@/components/TimerRing';
@@ -157,8 +156,8 @@ export default function HomeScreen() {
         </ThemedView>
 
         {/* Time Settings */}
-        <View style={{ flex: 1, justifyContent: 'center', width: '100%' }}>
-          {!isRunning && (
+        {!isRunning && (
+          <View style={{ flex: 1, justifyContent: 'center', width: '100%' }}>
             <View style={[styles.timeSettingsRow, { marginBottom: 0 }]}>
               <View style={styles.timeSetting}>
                 <ThemedText style={{ color: secondary, fontSize: 12, fontFamily: Fonts.sansBold }}>FOCUS</ThemedText>
@@ -185,8 +184,8 @@ export default function HomeScreen() {
                 </View>
               </View>
             </View>
-          )}
-        </View>
+          </View>
+        )}
 
         <ThemedView style={[styles.controls, { backgroundColor: 'transparent' }]}>
           <View style={[styles.controls, { backgroundColor: 'transparent' }]}>
