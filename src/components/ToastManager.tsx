@@ -69,7 +69,7 @@ export function ToastManager() {
       )}
 
       {/* Kicked Modal */}
-      <Modal visible={kickedModalVisible} animationType="fade" transparent>
+      {kickedModalVisible && (
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.background, alignItems: 'center' }]}>
             <ThemedText type="title" style={{ color: theme.text, fontSize: 24, fontFamily: Fonts.serifBold, marginBottom: Spacing.three }}>
@@ -86,7 +86,7 @@ export function ToastManager() {
             </Pressable>
           </View>
         </View>
-      </Modal>
+      )}
     </>
   );
 }
@@ -111,13 +111,21 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 9999,
+    elevation: 9999,
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
   },
   modalContent: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    width: '90%',
+    borderRadius: 24,
     padding: Spacing.four,
     paddingBottom: Spacing.six,
   },

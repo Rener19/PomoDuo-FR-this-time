@@ -1,5 +1,5 @@
-import { Platform, StyleSheet, TextProps } from 'react-native';
-import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { Platform, StyleSheet, Text, TextProps } from 'react-native';
+import { useIsFocused } from 'expo-router';
 
 import { Fonts, ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -12,16 +12,12 @@ export type ThemedTextProps = TextProps & {
 export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
   const theme = useTheme();
   const textColor = theme[themeColor ?? 'text'];
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      color: withTiming(textColor, { duration: 400 }),
-    };
-  }, [textColor]);
+  const isFocused = useIsFocused();
 
   return (
-    <Animated.Text
+    <Text
       style={[
+        { color: textColor },
         type === 'default' && styles.default,
         type === 'title' && styles.title,
         type === 'small' && styles.small,
@@ -30,7 +26,6 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
         type === 'link' && styles.link,
         type === 'linkPrimary' && styles.linkPrimary,
         type === 'code' && styles.code,
-        animatedStyle,
         style,
       ]}
       {...rest}

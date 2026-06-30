@@ -99,12 +99,12 @@ export const useTimerStore = create<TimerState>((set, get) => ({
 
   tick: () => {
     set((state) => {
-      if (!state.isRunning || !state.targetEndTime || state.timeLeft <= 0) return state;
+      if (!state.isRunning || !state.targetEndTime) return state;
       const remainingMs = state.targetEndTime - Date.now();
       const newTimeLeft = Math.max(0, Math.ceil(remainingMs / 1000));
 
-      // Auto-switch mode when timer hits zero and auto-start
-      if (newTimeLeft <= 0) {
+      // Auto-switch mode when timer has stayed at zero for 1 second
+      if (remainingMs <= -1000) {
         // Log focus time if finishing focus mode
         if (state.mode === 'focus') {
           const user = useAuthStore.getState().user;

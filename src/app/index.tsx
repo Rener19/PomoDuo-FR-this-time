@@ -34,7 +34,7 @@ export default function HomeScreen() {
       interval = safeSetInterval(() => tick(), 1000);
     }
     return () => safeClearInterval(interval);
-  }, [isRunning, duo.sessionId, duo.waitingForFriends]);
+  }, [isRunning, duo.sessionId, duo.waitingForFriends, mode]);
 
   // Handle app background/foreground for solo timer
   useEffect(() => {
@@ -222,9 +222,12 @@ export default function HomeScreen() {
         </ThemedView>
 
         {/* Invite Friends Modal */}
-        <Modal visible={showInviteModal} animationType="fade" transparent>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: background }]}>
+        {showInviteModal && (
+          <Pressable 
+            style={[styles.modalOverlay, { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, zIndex: 9999, elevation: 9999 }]}
+            onPress={() => setShowInviteModal(false)}
+          >
+            <Pressable style={[styles.modalContent, { backgroundColor: background }]} onPress={(e) => e.stopPropagation()}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.three }}>
                 <ThemedText type="title" style={{ color: textColor, fontSize: 22, fontFamily: Fonts.serifBold }}>Invite Friends</ThemedText>
                 <Pressable onPress={() => setShowInviteModal(false)}>
@@ -232,7 +235,7 @@ export default function HomeScreen() {
                 </Pressable>
               </View>
 
-              <ScrollView style={{ maxHeight: 400 }}>
+              <ScrollView style={{ maxHeight: 400 }} keyboardShouldPersistTaps="handled">
                 {friends.length === 0 ? (
                   <ThemedText style={{ color: secondary, textAlign: 'center', marginTop: Spacing.four }}>
                     No friends yet. Add friends first!
@@ -262,9 +265,9 @@ export default function HomeScreen() {
                   })
                 )}
               </ScrollView>
-            </View>
-          </View>
-        </Modal>
+            </Pressable>
+          </Pressable>
+        )}
 
         </View>
       </SafeAreaView>

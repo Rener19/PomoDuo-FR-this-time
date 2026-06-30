@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, View, Text, Dimensions } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import Animated, { useSharedValue, useAnimatedProps, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedProps, useAnimatedStyle, withTiming, Easing, interpolateColor } from 'react-native-reanimated';
 import { useTimerStore } from '@/store/timerStore';
 import { useDuoStore } from '@/store/duoStore';
 import { useTheme } from '@/hooks/use-theme';
@@ -41,7 +41,6 @@ export function TimerRing({ size = defaultSize, strokeWidth = 8 }) {
   }
 
   const strokeDashoffset = useSharedValue(circumference);
-
   useEffect(() => {
     strokeDashoffset.value = withTiming(circumference * (1 - progress), {
       duration: 1000,
@@ -51,28 +50,37 @@ export function TimerRing({ size = defaultSize, strokeWidth = 8 }) {
 
   const isFocus = mode === 'focus';
 
-  // Opacity styles for perfect synchronization with ThemedView
-  const focusOpacityStyle = useAnimatedStyle(() => {
-    return {
-      opacity: withTiming(isFocus ? 1 : 0, { duration: 400 }),
-    };
+  // Animate a shared value between 0 (break) and 1 (focus)
+  const modeTransition = useSharedValue(isFocus ? 1 : 0);
+  
+  useEffect(() => {
+    modeTransition.value = withTiming(isFocus ? 1 : 0, { duration: 500 });
   }, [isFocus]);
 
-  const breakOpacityStyle = useAnimatedStyle(() => {
-    return {
-      opacity: withTiming(isFocus ? 0 : 1, { duration: 400 }),
-    };
-  }, [isFocus]);
+  const animatedBgCircleProps = useAnimatedProps(() => {
+    const stroke = interpolateColor(
+      modeTransition.value,
+      [0, 1],
+      [breakColors.timerCircle, focusColors.timerCircle]
+    );
+    return { stroke };
+  }, [breakColors, focusColors]);
 
-  const animatedDashoffset = useAnimatedProps(() => {
+  const animatedProgressProps = useAnimatedProps(() => {
+    const stroke = interpolateColor(
+      modeTransition.value,
+      [0, 1],
+      [breakColors.timerProgress, focusColors.timerProgress]
+    );
     return {
       strokeDashoffset: strokeDashoffset.value,
+      stroke,
     };
-  });
+  }, [breakColors, focusColors]);
 
   const animatedTextStyle = useAnimatedStyle(() => {
     return {
-      color: withTiming(isFocus ? focusColors.timerProgress : breakColors.timerProgress, { duration: 400 }),
+      color: withTiming(isFocus ? focusColors.timerProgress : breakColors.timerProgress, { duration: 500 }),
     };
   }, [isFocus, focusColors, breakColors]);
 
@@ -90,16 +98,15 @@ export function TimerRing({ size = defaultSize, strokeWidth = 8 }) {
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
-      {/* Break Mode SVG Layer */}
-      <Animated.View style={[{ position: 'absolute' }, breakOpacityStyle]}>
+      <Animated.View style={{ position: 'absolute' }}>
         <Svg width={size} height={size}>
-          <Circle
+          <AnimatedCircle
             fill="none"
             cx={size / 2}
             cy={size / 2}
             r={radius}
             strokeWidth={strokeWidth}
-            stroke={breakColors.timerCircle}
+            animatedProps={animatedBgCircleProps}
           />
           <AnimatedCircle
             fill="none"
@@ -108,36 +115,9 @@ export function TimerRing({ size = defaultSize, strokeWidth = 8 }) {
             r={radius}
             strokeWidth={strokeWidth}
             strokeDasharray={circumference}
-            animatedProps={animatedDashoffset}
+            animatedProps={animatedProgressProps}
             strokeLinecap="round"
             transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            stroke={breakColors.timerProgress}
-          />
-        </Svg>
-      </Animated.View>
-
-      {/* Focus Mode SVG Layer */}
-      <Animated.View style={[{ position: 'absolute' }, focusOpacityStyle]}>
-        <Svg width={size} height={size}>
-          <Circle
-            fill="none"
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            strokeWidth={strokeWidth}
-            stroke={focusColors.timerCircle}
-          />
-          <AnimatedCircle
-            fill="none"
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            strokeWidth={strokeWidth}
-            strokeDasharray={circumference}
-            animatedProps={animatedDashoffset}
-            strokeLinecap="round"
-            transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            stroke={focusColors.timerProgress}
           />
         </Svg>
       </Animated.View>

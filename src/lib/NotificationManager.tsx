@@ -56,8 +56,10 @@ export function NotificationManager() {
           const timerEndedNaturally = Date.now() >= oldTargetEnd - 2000;
 
           if (timerEndedNaturally) {
-            // Force play the alarm immediately to bypass Android AlarmManager batching/delays
-            triggerImmediateAlarm(ringingMode);
+            // Delay the alarm slightly to allow the full 1000ms UI ring animation to finish smoothly without dropping frames!
+            setTimeout(() => {
+              triggerImmediateAlarm(ringingMode);
+            }, 1050);
             
             // Let the alarm ring fully, then clear it from the notification tray after 8 seconds
             setTimeout(() => {
@@ -70,25 +72,34 @@ export function NotificationManager() {
             }, 2000);
           } else {
             // User manually skipped the timer or joined a session!
-            // Clear any pending old alarms immediately so they don't suddenly play
-            clearAlarmNotification(ringingMode);
-            startForegroundService(activeTimer.mode, activeTimer.timeLeft, activeTimer.targetEndTime);
+            // Delay the heavy Notifee bridge calls until after the UI transition finishes
+            setTimeout(() => {
+              clearAlarmNotification(ringingMode);
+              startForegroundService(activeTimer.mode, activeTimer.timeLeft, activeTimer.targetEndTime);
+            }, 1050);
           }
         } else {
-          startForegroundService(activeTimer.mode, activeTimer.timeLeft, activeTimer.targetEndTime);
+          // Normal timer start / session change / sound change
+          setTimeout(() => {
+            startForegroundService(activeTimer.mode, activeTimer.timeLeft, activeTimer.targetEndTime);
+          }, 1050);
         }
       }
     } else {
       // Stopped or Paused
       if (lastTargetEndRef.current !== 0) {
         lastTargetEndRef.current = 0;
-        updateTimerNotification(activeTimer.mode, activeTimer.timeLeft, false, null);
+        setTimeout(() => {
+          updateTimerNotification(activeTimer.mode, activeTimer.timeLeft, false, null);
+        }, 50);
       }
       
       const initialFocus = 'totalFocusTime' in activeTimer ? activeTimer.totalFocusTime : activeTimer.focusTime;
       if (activeTimer.timeLeft === (activeTimer.mode === 'focus' ? initialFocus * 60 : activeTimer.breakTime * 60)) {
          // Reset pressed
-         stopForegroundService();
+         setTimeout(() => {
+           stopForegroundService();
+         }, 50);
       }
     }
   }, [

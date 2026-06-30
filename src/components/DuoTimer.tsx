@@ -77,7 +77,7 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
       interval = safeSetInterval(() => tick(), 1000);
     }
     return () => safeClearInterval(interval);
-  }, [isRunning]);
+  }, [isRunning, mode]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
@@ -157,13 +157,12 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
           {/* Controls — only host can control the timer */}
           {isHost ? (
             <View style={styles.controls}>
-              <Pressable
-                style={[styles.button, { backgroundColor: primary }]}
-                onPress={isRunning ? pauseTimer : startTimer}
-              >
-                <ThemedText style={{ color: background, fontFamily: Fonts.sansBold, fontSize: 18, letterSpacing: 1 }}>
-                  {isRunning ? 'PAUSE' : 'START'}
-                </ThemedText>
+              <Pressable style={{ width: '100%' }} onPress={isRunning ? pauseTimer : startTimer}>
+                <ThemedView type="primary" style={[styles.button, { width: '100%' }]}>
+                  <ThemedText themeColor="background" style={{ fontFamily: Fonts.sansBold, fontSize: 18, letterSpacing: 1 }}>
+                    {isRunning ? 'PAUSE' : 'START'}
+                  </ThemedText>
+                </ThemedView>
               </Pressable>
 
               <View style={{ flexDirection: 'row', gap: Spacing.two, width: '100%' }}>
@@ -227,9 +226,12 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
         </View>
 
         {/* Hamburger Menu Modal */}
-        <Modal visible={showMenu} animationType="fade" transparent>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: background }]}>
+        {showMenu && (
+          <Pressable 
+            style={[styles.modalOverlay, { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, zIndex: 9999, elevation: 9999 }]}
+            onPress={() => setShowMenu(false)}
+          >
+            <Pressable style={[styles.modalContent, { backgroundColor: background }]} onPress={(e) => e.stopPropagation()}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <ThemedText type="title" style={{ color: textColor, fontSize: 22, fontFamily: Fonts.serifBold }}>Menu</ThemedText>
                 <Pressable onPress={() => setShowMenu(false)}>
@@ -290,14 +292,17 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
               >
                 <ThemedText style={{ color: destructive, fontFamily: Fonts.sansBold }}>Leave Session</ThemedText>
               </Pressable>
-            </View>
-          </View>
-        </Modal>
+            </Pressable>
+          </Pressable>
+        )}
 
         {/* Invite Friends Modal */}
-        <Modal visible={showInviteModal} animationType="fade" transparent>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: background }]}>
+        {showInviteModal && (
+          <Pressable 
+            style={[styles.modalOverlay, { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, zIndex: 9999, elevation: 9999 }]}
+            onPress={() => setShowInviteModal(false)}
+          >
+            <Pressable style={[styles.modalContent, { backgroundColor: background }]} onPress={(e) => e.stopPropagation()}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.three }}>
                 <ThemedText type="title" style={{ color: textColor, fontSize: 22, fontFamily: Fonts.serifBold }}>Invite Friends</ThemedText>
                 <Pressable onPress={() => setShowInviteModal(false)}>
@@ -305,7 +310,7 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
                 </Pressable>
               </View>
 
-              <ScrollView style={{ maxHeight: 400 }}>
+              <ScrollView style={{ maxHeight: 400 }} keyboardShouldPersistTaps="handled">
                 {friends.length === 0 ? (
                   <ThemedText style={{ color: secondary, textAlign: 'center', marginTop: Spacing.four }}>
                     No friends yet. Add friends first!
@@ -335,9 +340,9 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
                   })
                 )}
               </ScrollView>
-            </View>
-          </View>
-        </Modal>
+            </Pressable>
+          </Pressable>
+        )}
       </SafeAreaView>
     </ThemedView>
   );

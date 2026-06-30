@@ -831,11 +831,11 @@ export const useDuoStore = create<DuoState>((set, get) => ({
 
   tick: () => {
     set((state) => {
-      if (!state.isRunning || !state.targetEndTime || state.timeLeft <= 0) return state;
+      if (!state.isRunning || !state.targetEndTime) return state;
       const remainingMs = state.targetEndTime - Date.now();
       const newTimeLeft = Math.max(0, Math.ceil(remainingMs / 1000));
       
-      if (newTimeLeft <= 0) {
+      if (remainingMs <= -1000) {
         // Log focus time if finishing focus mode
         if (state.mode === 'focus') {
           const user = useAuthStore.getState().user;
