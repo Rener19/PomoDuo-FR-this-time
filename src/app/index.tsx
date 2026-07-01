@@ -16,7 +16,7 @@ import BackgroundTimer from 'react-native-background-timer';
 import { safeSetInterval, safeClearInterval } from '@/lib/timerUtils';
 
 export default function HomeScreen() {
-  const { isRunning, start, pause, reset, tick, syncFromBackground, mode, switchMode, totalFocusTime, breakTime, setTotalFocusTime, setBreakTime, timeLeft } = useTimerStore();
+  const { isRunning, start, pause, reset, tick, syncFromBackground, mode, switchMode, totalFocusTime, breakTime, setTotalFocusTime, setBreakTime, timeLeft, savedFocusTimeLeft, savedBreakTimeLeft } = useTimerStore();
   const duo = useDuoStore();
   const { user, profile } = useAuthStore();
   const theme = useTheme();
@@ -24,6 +24,12 @@ export default function HomeScreen() {
 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [friends, setFriends] = useState<any[]>([]);
+
+  const focusElapsed = mode === 'focus' ? totalFocusTime * 60 - timeLeft : (savedFocusTimeLeft !== null ? totalFocusTime * 60 - savedFocusTimeLeft : 0);
+  const minFocusMinutes = Math.min(totalFocusTime, Math.max(1, Math.ceil(focusElapsed / 60) + 1));
+
+  const breakElapsed = mode === 'break' ? breakTime * 60 - timeLeft : (savedBreakTimeLeft !== null ? breakTime * 60 - savedBreakTimeLeft : 0);
+  const minBreakMinutes = Math.min(breakTime, Math.max(1, Math.ceil(breakElapsed / 60) + 1));
 
   // All hooks must run before any conditional returns
   useEffect(() => {
@@ -107,7 +113,7 @@ export default function HomeScreen() {
   }
 
   // ─── Duo Mode ──────────────────────────────────────────────
-  const isDuoActive = duo.sessionId && !duo.waitingForFriends;
+  const isDuoActive = (duo.sessionId && !duo.waitingForFriends) || duo.isConnectingToSession;
   
   if (isDuoActive) {
     return <DuoTimer onLeave={() => { if (user) duo.leaveSession(user.id); }} />;
@@ -161,7 +167,7 @@ export default function HomeScreen() {
                 <ThemedText style={{ color: secondary, fontSize: 12, fontFamily: Fonts.sansBold }}>FOCUS</ThemedText>
                 <View style={{ width: 120, height: 60, marginTop: 4 }}>
                   <ScrollPicker
-                    items={Array.from({ length: 60 }, (_, i) => i + 1)}
+                    items={Array.from({ length: 61 - minFocusMinutes }, (_, i) => i + minFocusMinutes)}
                     selectedValue={totalFocusTime}
                     onValueChange={(val) => setTotalFocusTime(val)}
                     textColor={textColor}
@@ -173,7 +179,7 @@ export default function HomeScreen() {
                 <ThemedText style={{ color: secondary, fontSize: 12, fontFamily: Fonts.sansBold }}>BREAK</ThemedText>
                 <View style={{ width: 120, height: 60, marginTop: 4 }}>
                   <ScrollPicker
-                    items={Array.from({ length: 60 }, (_, i) => i + 1)}
+                    items={Array.from({ length: 61 - minBreakMinutes }, (_, i) => i + minBreakMinutes)}
                     selectedValue={breakTime}
                     onValueChange={(val) => setBreakTime(val)}
                     textColor={textColor}

@@ -38,6 +38,7 @@ interface DuoState {
   kickedModalVisible: boolean;
   kickedUserIds: string[];
   hasReceivedInitialSync: boolean;
+  isConnectingToSession: boolean;
   
   // Actions
   setKickedModalVisible: (visible: boolean) => void;
@@ -151,6 +152,8 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
           targetEndTime: soloState.targetEndTime,
           focusTime: soloState.totalFocusTime,
           breakTime: soloState.breakTime,
+          savedFocusTimeLeft: soloState.savedFocusTimeLeft,
+          savedBreakTimeLeft: soloState.savedBreakTimeLeft,
         });
       } else if (currentState.isHost && currentState.isRunning && currentState.targetEndTime) {
         // Otherwise just update our background timer
@@ -193,7 +196,39 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
              timeLeft: state.timeLeft,
              mode: state.mode,
              isRunning: state.isRunning,
-             targetEndTime: state.targetEndTime
+             targetEndTime: state.targetEndTime,
+             totalFocusTime: state.focusTime,
+             breakTime: state.breakTime,
+             savedFocusTimeLeft: state.savedFocusTimeLeft,
+             savedBreakTimeLeft: state.savedBreakTimeLeft,
+           });
+        }
+        
+        return {
+          participants: newParticipants,
+          waitingForFriends: state.isHost ? shouldWait : state.waitingForFriends,
+        };
+      });
+    })
+    .on('presence', { event: 'leave' }, ({ key }) => {
+      // Supabase Presence automatically detects if a user's app crashes or connection drops.
+      set((state: DuoState) => {
+        const newParticipants = state.participants.filter((p: any) => p.id !== key);
+        // If they were already removed by participant_left, do nothing to avoid redundant state updates
+        if (newParticipants.length === state.participants.length) return state;
+
+        const shouldWait = newParticipants.length <= 1;
+        
+        if (state.isHost && shouldWait && !state.waitingForFriends) {
+           useTimerStore.setState({
+             timeLeft: state.timeLeft,
+             mode: state.mode,
+             isRunning: state.isRunning,
+             targetEndTime: state.targetEndTime,
+             totalFocusTime: state.focusTime,
+             breakTime: state.breakTime,
+             savedFocusTimeLeft: state.savedFocusTimeLeft,
+             savedBreakTimeLeft: state.savedBreakTimeLeft,
            });
         }
         
@@ -210,10 +245,14 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
       if (currentUser?.id === kickedUserId) {
         // I am the one kicked
         useTimerStore.setState({
-           timeLeft: get().timeLeft,
-           mode: get().mode,
-           isRunning: get().isRunning,
-           targetEndTime: get().targetEndTime
+           totalFocusTime: 25,
+           breakTime: 5,
+           timeLeft: 25 * 60,
+           mode: 'focus',
+           isRunning: false,
+           targetEndTime: null,
+           savedFocusTimeLeft: null,
+           savedBreakTimeLeft: null,
         });
         get().setKickedModalVisible(true);
         get().leaveSession(currentUser!.id);
@@ -278,6 +317,7 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   kickedModalVisible: false,
   kickedUserIds: [],
   hasReceivedInitialSync: false,
+  isConnectingToSession: false,
 
   setKickedModalVisible: (visible) => set({ kickedModalVisible: visible }),
   kickParticipant: (userId: string, username: string) => {
@@ -447,9 +487,10 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   },
 
   acceptInvite: async (invite, userId, username) => {
-    // Optimistic update
+    // Optimistic update and set connecting state
     set((state) => ({
       pendingInvites: state.pendingInvites.filter((i) => i.id !== invite.id),
+      isConnectingToSession: true,
     }));
 
     // Update invite status
@@ -460,6 +501,7 @@ export const useDuoStore = create<DuoState>((set, get) => ({
 
     if (error) {
       console.error('Error accepting invite:', error);
+      set({ isConnectingToSession: false });
       return false;
     }
 
@@ -476,7 +518,10 @@ export const useDuoStore = create<DuoState>((set, get) => ({
       .eq('id', invite.session_id)
       .single();
 
-    if (!session) return false;
+    if (!session) {
+      set({ isConnectingToSession: false });
+      return false;
+    }
 
     // If currently in another session, leave it first
     if (get().sessionId) {
@@ -498,10 +543,11 @@ export const useDuoStore = create<DuoState>((set, get) => ({
     // Also update hostId from session
     set({ hostId: session.host_id });
 
-    // Remove from pending
+    // Remove from pending and reset connecting state
     set((state) => ({
       pendingInvites: state.pendingInvites.filter((i) => i.id !== invite.id),
       waitingForFriends: false,
+      isConnectingToSession: false,
     }));
 
     return true;
@@ -582,6 +628,9 @@ export const useDuoStore = create<DuoState>((set, get) => ({
 
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
+        // Track presence so the server knows we are here and can detect if we crash
+        channel.track({ id: userId, username });
+        
         channel.send({
           type: 'broadcast',
           event: 'participant_joined',
@@ -641,11 +690,16 @@ export const useDuoStore = create<DuoState>((set, get) => ({
 
     if (sessionId) {
       // Sync the timer to the solo mode before leaving so it continues seamlessly
+      // Wait, user explicitly requested to reset to 25 and 5 instead of transferring
       useTimerStore.setState({
-         timeLeft: get().timeLeft,
-         mode: get().mode,
-         isRunning: get().isRunning,
-         targetEndTime: get().targetEndTime
+         totalFocusTime: 25,
+         breakTime: 5,
+         timeLeft: 25 * 60,
+         mode: 'focus',
+         isRunning: false,
+         targetEndTime: null,
+         savedFocusTimeLeft: null,
+         savedBreakTimeLeft: null,
       });
       await supabase.from('session_participants').delete().match({ session_id: sessionId, user_id: userId });
     }
@@ -666,6 +720,7 @@ export const useDuoStore = create<DuoState>((set, get) => ({
       waitingForFriends: false,
       kickedUserIds: [],
       hasReceivedInitialSync: false,
+      isConnectingToSession: false,
     });
     
     // Clear any pending triggers from the session
@@ -739,8 +794,8 @@ export const useDuoStore = create<DuoState>((set, get) => ({
     const { mode, focusTime, timeLeft, savedFocusTimeLeft, channel } = get();
     const diffMinutes = minutes - focusTime;
     if (diffMinutes < 0) {
-      if (mode === 'focus' && timeLeft < 60) return;
-      if (mode !== 'focus' && savedFocusTimeLeft !== null && savedFocusTimeLeft < 60) return;
+      if (mode === 'focus' && timeLeft + (diffMinutes * 60) <= 0) return;
+      if (mode !== 'focus' && savedFocusTimeLeft !== null && savedFocusTimeLeft + (diffMinutes * 60) <= 0) return;
     }
 
     let newTimeLeft = timeLeft;
@@ -768,8 +823,8 @@ export const useDuoStore = create<DuoState>((set, get) => ({
     const { mode, breakTime, timeLeft, savedBreakTimeLeft, channel } = get();
     const diffMinutes = minutes - breakTime;
     if (diffMinutes < 0) {
-      if (mode === 'break' && timeLeft < 60) return;
-      if (mode !== 'break' && savedBreakTimeLeft !== null && savedBreakTimeLeft < 60) return;
+      if (mode === 'break' && timeLeft + (diffMinutes * 60) <= 0) return;
+      if (mode !== 'break' && savedBreakTimeLeft !== null && savedBreakTimeLeft + (diffMinutes * 60) <= 0) return;
     }
 
     let newTimeLeft = timeLeft;

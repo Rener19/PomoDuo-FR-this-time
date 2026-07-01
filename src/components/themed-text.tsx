@@ -16,8 +16,20 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
   const isFocused = useIsFocused();
   
   const flatStyle = StyleSheet.flatten(style) || {};
+  const typeMap: Record<string, ThemeColor> = {
+    default: 'text',
+    title: 'text',
+    small: 'text',
+    smallBold: 'text',
+    subtitle: 'textSecondary',
+    link: 'primary',
+    linkPrimary: 'primary',
+    code: 'textSecondary',
+  };
+
   const hasExplicitColor = flatStyle.color !== undefined;
-  const textColor = theme[themeColor ?? 'text'];
+  const colorKey = typeMap[type ?? 'default'] ?? 'text';
+  const textColor = theme?.[themeColor ?? colorKey] ?? theme?.text ?? '#ffffff';
 
   // Store the initial color to prevent Reanimated from reading unparseable Android native defaults
   const [initialColor] = useState(textColor);

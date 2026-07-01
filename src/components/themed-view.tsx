@@ -19,7 +19,7 @@ export function ThemedView({ style, lightColor, darkColor, type, ...otherProps }
   const flatStyle = StyleSheet.flatten(style) || {};
   const hasExplicitBackground = flatStyle.backgroundColor !== undefined;
   
-  const targetBg = type === 'transparent' ? 'transparent' : theme[type ?? 'background'];
+  const targetBg = type === 'transparent' ? 'transparent' : (theme?.[type ?? 'background'] ?? theme?.background ?? 'transparent');
 
   // Store the initial background to prevent Reanimated from reading unparseable native defaults
   const [initialBg] = useState(targetBg);

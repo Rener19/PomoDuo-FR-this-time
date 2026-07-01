@@ -27,7 +27,8 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
     focusTime, breakTime, setFocusTime, setBreakTime, inviteMoreFriends,
     sessionStartTime, completedFocusMinutes, completedBreakMinutes,
     waitingForFriends, sentInvites, cancelSentInvite,
-    kickedToastMessage, clearKickedToast, kickParticipant,
+    kickedModalVisible, setKickedModalVisible,
+    savedFocusTimeLeft, savedBreakTimeLeft, kickParticipant,
     hasReceivedInitialSync
   } = useDuoStore();
   const { user } = useAuthStore();
@@ -37,6 +38,12 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [friends, setFriends] = useState<any[]>([]);
+
+  const focusElapsed = mode === 'focus' ? focusTime * 60 - timeLeft : (savedFocusTimeLeft !== null ? focusTime * 60 - savedFocusTimeLeft : 0);
+  const minFocusMinutes = Math.min(focusTime, Math.max(1, Math.ceil(focusElapsed / 60) + 1));
+
+  const breakElapsed = mode === 'break' ? breakTime * 60 - timeLeft : (savedBreakTimeLeft !== null ? breakTime * 60 - savedBreakTimeLeft : 0);
+  const minBreakMinutes = Math.min(breakTime, Math.max(1, Math.ceil(breakElapsed / 60) + 1));
 
   // Toast logic moved to global ToastManager
 
@@ -189,7 +196,7 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
                     <ThemedText style={{ color: secondary, fontSize: 10, fontFamily: Fonts.sansBold }}>FOCUS</ThemedText>
                     <View style={{ width: 120, height: 60, marginTop: 4 }}>
                       <ScrollPicker
-                        items={Array.from({ length: 60 }, (_, i) => i + 1)}
+                        items={Array.from({ length: 61 - minFocusMinutes }, (_, i) => i + minFocusMinutes)}
                         selectedValue={focusTime}
                         onValueChange={(val) => setFocusTime(val)}
                         textColor={textColor}
@@ -201,7 +208,7 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
                     <ThemedText style={{ color: secondary, fontSize: 10, fontFamily: Fonts.sansBold }}>BREAK</ThemedText>
                     <View style={{ width: 120, height: 60, marginTop: 4 }}>
                       <ScrollPicker
-                        items={Array.from({ length: 60 }, (_, i) => i + 1)}
+                        items={Array.from({ length: 61 - minBreakMinutes }, (_, i) => i + minBreakMinutes)}
                         selectedValue={breakTime}
                         onValueChange={(val) => setBreakTime(val)}
                         textColor={textColor}

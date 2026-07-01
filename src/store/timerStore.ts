@@ -39,8 +39,8 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     set((state) => {
       const diffMinutes = minutes - state.totalFocusTime;
       if (diffMinutes < 0) {
-        if (state.mode === 'focus' && state.timeLeft < 60) return state;
-        if (state.mode !== 'focus' && state.savedFocusTimeLeft !== null && state.savedFocusTimeLeft < 60) return state;
+        if (state.mode === 'focus' && state.timeLeft + (diffMinutes * 60) <= 0) return state;
+        if (state.mode !== 'focus' && state.savedFocusTimeLeft !== null && state.savedFocusTimeLeft + (diffMinutes * 60) <= 0) return state;
       }
 
       let newTimeLeft = state.timeLeft;
@@ -61,8 +61,8 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     set((state) => {
       const diffMinutes = minutes - state.breakTime;
       if (diffMinutes < 0) {
-        if (state.mode === 'break' && state.timeLeft < 60) return state;
-        if (state.mode !== 'break' && state.savedBreakTimeLeft !== null && state.savedBreakTimeLeft < 60) return state;
+        if (state.mode === 'break' && state.timeLeft + (diffMinutes * 60) <= 0) return state;
+        if (state.mode !== 'break' && state.savedBreakTimeLeft !== null && state.savedBreakTimeLeft + (diffMinutes * 60) <= 0) return state;
       }
 
       let newTimeLeft = state.timeLeft;

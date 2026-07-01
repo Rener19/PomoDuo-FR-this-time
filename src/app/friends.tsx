@@ -148,10 +148,12 @@ export default function FriendsScreen() {
   async function handleAcceptSessionInvite(invite: any) {
     if (!user || !profile) return;
     const username = profile.username || 'User';
+    
+    // Navigate immediately to show the connecting screen
+    router.navigate('/');
+    
     const success = await acceptInvite(invite, user.id, username);
-    if (success) {
-      router.navigate('/');
-    } else {
+    if (!success) {
       Alert.alert('Error', 'Could not join session.');
     }
   }
