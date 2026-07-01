@@ -38,7 +38,9 @@
         {
           "android": {
             "foregroundService": {
-              "types": ["specialUse"],
+              "types": [
+                "specialUse"
+              ],
               "specialUseSubtype": "Timer for focus sessions"
             }
           }
@@ -53,11 +55,18 @@
             "imageWidth": 76
           }
         }
-      ]
+      ],
+      "./withAndroidAlarmSound.js"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "adae8876-1fda-44b6-a3de-8c8ddad448fa"
+      }
     }
   }
 }

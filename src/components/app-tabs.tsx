@@ -5,9 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/use-theme';
 import { Fonts } from '@/constants/theme';
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { useState } from 'react';
 
 function AnimatedTabBarBackground() {
   const colors = useTheme();
+  
+  const [initialBg] = useState(colors.background);
   
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -15,7 +18,7 @@ function AnimatedTabBarBackground() {
     };
   }, [colors.background]);
 
-  return <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, animatedStyle]} />;
+  return <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: initialBg }, animatedStyle]} />;
 }
 
 export default function AppTabs() {

@@ -19,6 +19,8 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [editingUsername, setEditingUsername] = useState(false);
   const [newUsername, setNewUsername] = useState('');
+  const [renameError, setRenameError] = useState('');
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -45,16 +47,13 @@ export default function ProfileScreen() {
   }
 
   async function handleSignOut() {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { 
-        text: 'Sign Out', 
-        style: 'destructive', 
-        onPress: async () => {
-          await signOut();
-        } 
-      },
-    ]);
+    if (!confirmSignOut) {
+      setConfirmSignOut(true);
+      // Reset confirmation if they don't click it again within 3 seconds
+      setTimeout(() => setConfirmSignOut(false), 3000);
+      return;
+    }
+    await signOut();
   }
 
   if (loading) {
@@ -88,31 +87,65 @@ export default function ProfileScreen() {
             </View>
             
             {editingUsername ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: Spacing.three, gap: Spacing.two }}>
-                <TextInput
-                  style={[styles.input, { color: text, borderColor: secondary }]}
-                  value={newUsername}
-                  onChangeText={setNewUsername}
-                  placeholder="New username"
-                  placeholderTextColor={secondary}
-                  autoCapitalize="none"
-                />
-                <Pressable onPress={async () => {
-                  if (!newUsername.trim()) return;
-                  await supabase.from('profiles').update({ username: newUsername }).eq('id', user?.id);
-                  setProfile({ ...profile, username: newUsername });
-                  useAuthStore.getState().updateProfile({ id: user!.id, username: newUsername });
-                  setEditingUsername(false);
-                }} style={{ backgroundColor: primary, padding: Spacing.two, borderRadius: Spacing.one }}>
-                  <ThemedText style={{ color: '#fff', fontFamily: Fonts.sansBold }}>Save</ThemedText>
-                </Pressable>
+              <View style={{ width: '100%', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: Spacing.three, gap: Spacing.two }}>
+                  <TextInput
+                    style={[styles.input, { color: text, borderColor: secondary }]}
+                    value={newUsername}
+                    onChangeText={(text) => {
+                      setNewUsername(text);
+                      setRenameError('');
+                    }}
+                    placeholder="New username"
+                    placeholderTextColor={secondary}
+                    autoCapitalize="none"
+                  />
+                  <Pressable onPress={async () => {
+                    const trimmedName = newUsername.trim();
+                    if (!trimmedName) return;
+                    if (trimmedName === profile?.username) {
+                      setEditingUsername(false);
+                      setRenameError('');
+                      return;
+                    }
+
+                    // Check if username already exists
+                    const { data: existing } = await supabase
+                      .from('profiles')
+                      .select('id')
+                      .eq('username', trimmedName)
+                      .maybeSingle();
+
+                    if (existing) {
+                      setRenameError('This username is already taken.');
+                      return;
+                    }
+
+                    await supabase.from('profiles').update({ username: trimmedName }).eq('id', user?.id);
+                    setProfile({ ...profile, username: trimmedName });
+                    useAuthStore.getState().updateProfile({ id: user!.id, username: trimmedName });
+                    setEditingUsername(false);
+                    setRenameError('');
+                  }} style={{ backgroundColor: primary, padding: Spacing.two, borderRadius: Spacing.one }}>
+                    <ThemedText style={{ color: '#fff', fontFamily: Fonts.sansBold }}>Save</ThemedText>
+                  </Pressable>
+                </View>
+                {renameError ? (
+                  <ThemedText style={{ color: destructive, fontSize: 12, marginTop: Spacing.one, fontFamily: Fonts.sansBold }}>
+                    {renameError}
+                  </ThemedText>
+                ) : null}
               </View>
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: Spacing.three, gap: Spacing.two }}>
                 <ThemedText style={{ color: text, fontSize: 24, fontFamily: Fonts.sansBold }}>
                   {profile?.username || 'User'}
                 </ThemedText>
-                <Pressable onPress={() => setEditingUsername(true)}>
+                <Pressable onPress={() => {
+                  setEditingUsername(true);
+                  setNewUsername(profile?.username || '');
+                  setRenameError('');
+                }}>
                   <ThemedText style={{ color: primary, fontSize: 16 }}>✎</ThemedText>
                 </Pressable>
               </View>
@@ -166,11 +199,19 @@ export default function ProfileScreen() {
           {/* Actions */}
           <View style={{ marginTop: Spacing.six }}>
             <Pressable 
-              style={[styles.btn, { backgroundColor: backgroundElement, borderColor: destructive, borderWidth: 1 }]} 
+              style={[styles.btn, { 
+                backgroundColor: confirmSignOut ? destructive : backgroundElement, 
+                borderColor: destructive, 
+                borderWidth: 1 
+              }]} 
               onPress={handleSignOut}
             >
-              <ThemedText style={{ color: destructive, fontFamily: Fonts.sansBold, fontSize: 16 }}>
-                Sign Out
+              <ThemedText style={{ 
+                color: confirmSignOut ? '#fff' : destructive, 
+                fontFamily: Fonts.sansBold, 
+                fontSize: 16 
+              }}>
+                {confirmSignOut ? 'Tap again to confirm' : 'Sign Out'}
               </ThemedText>
             </Pressable>
           </View>

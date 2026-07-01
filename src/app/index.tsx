@@ -65,11 +65,6 @@ export default function HomeScreen() {
     }
   }, [showInviteModal]);
 
-  // Close the invite modal automatically when entering or leaving a session
-  useEffect(() => {
-    setShowInviteModal(false);
-  }, [duo.sessionId]);
-
   async function loadFriends() {
     const { data } = await supabase
       .from('friends')

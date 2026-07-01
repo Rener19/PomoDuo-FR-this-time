@@ -216,10 +216,10 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
            targetEndTime: get().targetEndTime
         });
         get().setKickedModalVisible(true);
-        get().leaveSession(currentUser.id);
+        get().leaveSession(currentUser!.id);
       } else {
         // Someone else was kicked
-        set(s => ({ kickedUserIds: [...s.kickedUserIds, kickedUserId] }));
+        set((s: DuoState) => ({ kickedUserIds: [...s.kickedUserIds, kickedUserId] }));
       }
     })
     .on('broadcast', { event: 'timer_sync' }, ({ payload }) => {
@@ -392,6 +392,16 @@ export const useDuoStore = create<DuoState>((set, get) => ({
     const initialTimeLeft = timeLeft !== undefined ? timeLeft : focusMin * 60;
     get().joinSessionChannel(session.id, hostId, hostUsername, focusMin, breakMin, true, false, true, mode, initialTimeLeft, isRunning);
     // waitingForFriends is now handled correctly by the SUBSCRIBED callback
+
+    // Auto-cancel invites after 10 seconds
+    setTimeout(() => {
+      const currentSentInvites = get().sentInvites;
+      friendIds.forEach(fid => {
+        if (currentSentInvites.includes(fid)) {
+          get().cancelSentInvite(fid);
+        }
+      });
+    }, 10000);
   },
 
   inviteMoreFriends: async (hostId, friendIds) => {
@@ -414,6 +424,16 @@ export const useDuoStore = create<DuoState>((set, get) => ({
     );
     const { error } = await supabase.from('session_invites').insert(invites);
     if (error) console.error('Error inviting more friends:', error);
+
+    // Auto-cancel invites after 10 seconds
+    setTimeout(() => {
+      const currentSentInvites = get().sentInvites;
+      friendIds.forEach(fid => {
+        if (currentSentInvites.includes(fid)) {
+          get().cancelSentInvite(fid);
+        }
+      });
+    }, 10000);
   },
 
   cancelSentInvite: async (friendId: string) => {
@@ -853,7 +873,10 @@ export const useDuoStore = create<DuoState>((set, get) => ({
         const nextMode = state.mode === 'focus' ? 'break' : 'focus';
         const nextTimeLeft = nextMode === 'focus' ? state.focusTime * 60 : state.breakTime * 60;
         
-        const newTargetEndTime = Date.now() + nextTimeLeft * 1000;
+        let newTargetEndTime = state.targetEndTime + (nextTimeLeft * 1000);
+        if (newTargetEndTime <= Date.now()) {
+          newTargetEndTime = Date.now() + (nextTimeLeft * 1000);
+        }
         
         if (state.isHost && state.channel) {
           state.channel.send({
@@ -901,7 +924,11 @@ export const useDuoStore = create<DuoState>((set, get) => ({
 
         const nextMode = state.mode === 'focus' ? 'break' : 'focus';
         const nextTimeLeft = nextMode === 'focus' ? state.focusTime * 60 : state.breakTime * 60;
-        const newTargetEndTime = state.targetEndTime + nextTimeLeft * 1000;
+        
+        let newTargetEndTime = state.targetEndTime + (nextTimeLeft * 1000);
+        if (newTargetEndTime <= Date.now()) {
+          newTargetEndTime = Date.now() + (nextTimeLeft * 1000);
+        }
         
         if (state.isHost && state.channel) {
           state.channel.send({

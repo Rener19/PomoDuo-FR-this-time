@@ -121,7 +121,11 @@ export const useTimerStore = create<TimerState>((set, get) => ({
 
         const nextMode = state.mode === 'focus' ? 'break' : 'focus';
         const nextTimeLeft = nextMode === 'focus' ? state.totalFocusTime * 60 : state.breakTime * 60;
-        const newTargetEndTime = Date.now() + nextTimeLeft * 1000;
+        
+        let newTargetEndTime = state.targetEndTime + (nextTimeLeft * 1000);
+        if (newTargetEndTime <= Date.now()) {
+          newTargetEndTime = Date.now() + (nextTimeLeft * 1000);
+        }
         
         return { 
           mode: nextMode, 
@@ -183,7 +187,11 @@ export const useTimerStore = create<TimerState>((set, get) => ({
 
         const nextMode = state.mode === 'focus' ? 'break' : 'focus';
         const nextTimeLeft = nextMode === 'focus' ? state.totalFocusTime * 60 : state.breakTime * 60;
-        const newTargetEndTime = Date.now() + nextTimeLeft * 1000;
+        
+        let newTargetEndTime = state.targetEndTime + (nextTimeLeft * 1000);
+        if (newTargetEndTime <= Date.now()) {
+          newTargetEndTime = Date.now() + (nextTimeLeft * 1000);
+        }
         
         return { 
           mode: nextMode, 

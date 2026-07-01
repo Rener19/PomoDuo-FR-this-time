@@ -35,11 +35,6 @@ export function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const { background, text } = useTheme();
 
-  // Log the redirect URI so the user knows exactly what to add to Supabase
-  console.log('=== ADD THIS REDIRECT URL TO SUPABASE ===');
-  console.log(redirectTo);
-  console.log('==========================================');
-
   async function signInWithOAuth(provider: 'google' | 'facebook') {
     setLoading(true);
     try {
@@ -87,7 +82,7 @@ export function AuthScreen() {
 
       {/* Show the redirect URI for debugging */}
       <ThemedText style={{ color: text, fontSize: 10, marginBottom: Spacing.four, textAlign: 'center', opacity: 0.5 }}>
-        Redirect: {redirectTo}
+       
       </ThemedText>
 
       <View style={styles.buttonContainer}>
