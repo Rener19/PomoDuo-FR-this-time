@@ -99,6 +99,7 @@ interface DuoState {
   tick: () => void;
   syncFromBackground: () => void;
   syncChatMessages: () => Promise<void>;
+  cleanupGhostSessions: (userId: string) => Promise<void>;
 }
 
 function setupChannel(channel: RealtimeChannel, set: any, get: any) {
@@ -230,6 +231,27 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
              savedFocusTimeLeft: state.savedFocusTimeLeft,
              savedBreakTimeLeft: state.savedBreakTimeLeft,
            });
+        }
+
+        // --- Database Cleanup for Crashes ---
+        const { sessionId, isHost, hostId } = state;
+        
+        // If I am the host, and someone else crashed, delete them from the database
+        if (isHost && sessionId && key !== state.hostId) {
+           supabase.from('session_participants').delete().match({ session_id: sessionId, user_id: key }).then();
+        }
+
+        // If the HOST crashed, and I am the remaining participant, I should claim host
+        if (!isHost && sessionId && key === hostId) {
+           // We claim host ownership in the database
+           const myId = useAuthStore.getState().user?.id;
+           if (myId) {
+              supabase.from('duo_sessions').update({ host_id: myId }).eq('id', sessionId).then(() => {
+                 set({ hostId: myId, isHost: true, waitingForFriends: true });
+                 // If the session is empty after I claim host (e.g., I was the only one left and I leave later), 
+                 // the normal leaveSession logic will cleanly wipe it out.
+              });
+           }
         }
         
         return {
@@ -487,6 +509,11 @@ export const useDuoStore = create<DuoState>((set, get) => ({
   },
 
   acceptInvite: async (invite, userId, username) => {
+    // If currently in another session, leave it first to clear stale state
+    if (get().sessionId) {
+      await get().leaveSession(userId);
+    }
+
     // Optimistic update and set connecting state
     set((state) => ({
       pendingInvites: state.pendingInvites.filter((i) => i.id !== invite.id),
@@ -521,11 +548,6 @@ export const useDuoStore = create<DuoState>((set, get) => ({
     if (!session) {
       set({ isConnectingToSession: false });
       return false;
-    }
-
-    // If currently in another session, leave it first
-    if (get().sessionId) {
-      await get().leaveSession(userId);
     }
 
     // Join the channel — default chat to enabled if columns don't exist
@@ -676,6 +698,10 @@ export const useDuoStore = create<DuoState>((set, get) => ({
             payload: { newHostId: nextHost.id },
           });
         }
+      } else {
+        // No participants left, delete the entire session
+        // This will trigger ON DELETE CASCADE and wipe all chat messages for this session
+        await supabase.from('duo_sessions').delete().eq('id', sessionId);
       }
     }
 
@@ -728,7 +754,20 @@ export const useDuoStore = create<DuoState>((set, get) => ({
     notifee.cancelTriggerNotification('timer-end-break');
   },
 
-  // ─── Timer Controls (host only, broadcast to all) ───────────
+  cleanupGhostSessions: async (userId) => {
+    // If both users crash, ghost sessions stay in the database forever.
+    // This function runs when the app boots up. It checks if the user is the host
+    // of any session that is older than 12 hours, and explicitly deletes it.
+    const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+    
+    await supabase
+      .from('duo_sessions')
+      .delete()
+      .match({ host_id: userId })
+      .lt('created_at', twelveHoursAgo);
+  },
+
+  // ─── Host Timer Controls ─────────────────────────────────────────
 
   startTimer: () => {
     const { channel, timeLeft, focusTime, breakTime, mode } = get();

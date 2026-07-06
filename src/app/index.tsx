@@ -12,7 +12,6 @@ import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
 import { Spacing, Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import BackgroundTimer from 'react-native-background-timer';
 import { safeSetInterval, safeClearInterval } from '@/lib/timerUtils';
 
 export default function HomeScreen() {
@@ -26,10 +25,10 @@ export default function HomeScreen() {
   const [friends, setFriends] = useState<any[]>([]);
 
   const focusElapsed = mode === 'focus' ? totalFocusTime * 60 - timeLeft : (savedFocusTimeLeft !== null ? totalFocusTime * 60 - savedFocusTimeLeft : 0);
-  const minFocusMinutes = Math.min(totalFocusTime, Math.max(1, Math.ceil(focusElapsed / 60) + 1));
+  const minFocusMinutes = Math.max(1, Math.floor(focusElapsed / 60) + 1);
 
   const breakElapsed = mode === 'break' ? breakTime * 60 - timeLeft : (savedBreakTimeLeft !== null ? breakTime * 60 - savedBreakTimeLeft : 0);
-  const minBreakMinutes = Math.min(breakTime, Math.max(1, Math.ceil(breakElapsed / 60) + 1));
+  const minBreakMinutes = Math.max(1, Math.floor(breakElapsed / 60) + 1);
 
   // All hooks must run before any conditional returns
   useEffect(() => {

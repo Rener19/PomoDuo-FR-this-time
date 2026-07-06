@@ -13,7 +13,6 @@ export type ThemedTextProps = TextProps & {
 
 export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
   const theme = useTheme();
-  const isFocused = useIsFocused();
   
   const flatStyle = StyleSheet.flatten(style) || {};
   const typeMap: Record<string, ThemeColor> = {
@@ -39,9 +38,9 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
       return {};
     }
     return {
-      color: withTiming(textColor, { duration: isFocused ? 500 : 0 }),
+      color: withTiming(textColor, { duration: 150 }),
     };
-  }, [textColor, isFocused, hasExplicitColor]);
+  }, [textColor, hasExplicitColor]);
 
   return (
     <Animated.Text

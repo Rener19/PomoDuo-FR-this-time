@@ -19,6 +19,7 @@ import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
 import { NotificationManager } from '@/lib/NotificationManager';
 import { ToastManager } from '@/components/ToastManager';
+import { useDuoStore } from '@/store/duoStore';
 
 // MUST be at the module level so it runs before any component mounts.
 // This completes any pending auth sessions from a previous app launch.

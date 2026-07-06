@@ -14,7 +14,6 @@ export type ThemedViewProps = ViewProps & {
 
 export function ThemedView({ style, lightColor, darkColor, type, ...otherProps }: ThemedViewProps) {
   const theme = useTheme();
-  const isFocused = useIsFocused();
   
   const flatStyle = StyleSheet.flatten(style) || {};
   const hasExplicitBackground = flatStyle.backgroundColor !== undefined;
@@ -29,9 +28,9 @@ export function ThemedView({ style, lightColor, darkColor, type, ...otherProps }
       return {};
     }
     return {
-      backgroundColor: withTiming(targetBg, { duration: isFocused ? 500 : 0 }),
+      backgroundColor: withTiming(targetBg, { duration: 150 }),
     };
-  }, [hasExplicitBackground, targetBg, isFocused]);
+  }, [hasExplicitBackground, targetBg]);
 
   return <Animated.View style={[{ backgroundColor: initialBg }, style, animatedStyle]} {...otherProps} />;
 }

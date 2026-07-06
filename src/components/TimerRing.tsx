@@ -43,10 +43,10 @@ export function TimerRing({ size = defaultSize, strokeWidth = 8 }) {
   const strokeDashoffset = useSharedValue(circumference);
   useEffect(() => {
     strokeDashoffset.value = withTiming(circumference * (1 - progress), {
-      duration: 1000,
+      duration: isRunning ? 1000 : 150,
       easing: Easing.linear,
     });
-  }, [progress, circumference]);
+  }, [progress, circumference, isRunning]);
 
   const isFocus = mode === 'focus';
 
@@ -54,33 +54,25 @@ export function TimerRing({ size = defaultSize, strokeWidth = 8 }) {
   const modeTransition = useSharedValue(isFocus ? 1 : 0);
   
   useEffect(() => {
-    modeTransition.value = withTiming(isFocus ? 1 : 0, { duration: 500 });
+    modeTransition.value = withTiming(isFocus ? 1 : 0, { duration: 150 });
   }, [isFocus]);
 
   const animatedBgCircleProps = useAnimatedProps(() => {
-    const stroke = interpolateColor(
-      modeTransition.value,
-      [0, 1],
-      [breakColors.timerCircle, focusColors.timerCircle]
-    );
+    const stroke = withTiming(isFocus ? focusColors.timerCircle : breakColors.timerCircle, { duration: 150 });
     return { stroke };
-  }, [breakColors, focusColors]);
+  }, [isFocus, breakColors, focusColors]);
 
   const animatedProgressProps = useAnimatedProps(() => {
-    const stroke = interpolateColor(
-      modeTransition.value,
-      [0, 1],
-      [breakColors.timerProgress, focusColors.timerProgress]
-    );
+    const stroke = withTiming(isFocus ? focusColors.timerProgress : breakColors.timerProgress, { duration: 150 });
     return {
       strokeDashoffset: strokeDashoffset.value,
       stroke,
     };
-  }, [breakColors, focusColors]);
+  }, [isFocus, strokeDashoffset, breakColors, focusColors]);
 
   const animatedTextStyle = useAnimatedStyle(() => {
     return {
-      color: withTiming(isFocus ? focusColors.timerProgress : breakColors.timerProgress, { duration: 500 }),
+      color: withTiming(isFocus ? focusColors.timerProgress : breakColors.timerProgress, { duration: 150 }),
     };
   }, [isFocus, focusColors, breakColors]);
 

@@ -7,12 +7,10 @@ import { TimerRing } from '@/components/TimerRing';
 import { ChatBox } from '@/components/ChatBox';
 import { useDuoStore } from '@/store/duoStore';
 import { useAuthStore } from '@/store/authStore';
-import { useSettingsStore } from '@/store/settingsStore';
 import { ScrollPicker } from './ScrollPicker';
 import { Spacing, Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
-import BackgroundTimer from 'react-native-background-timer';
 import { safeSetInterval, safeClearInterval } from '@/lib/timerUtils';
 
 interface DuoTimerProps {
@@ -40,10 +38,10 @@ export function DuoTimer({ onLeave }: DuoTimerProps) {
   const [friends, setFriends] = useState<any[]>([]);
 
   const focusElapsed = mode === 'focus' ? focusTime * 60 - timeLeft : (savedFocusTimeLeft !== null ? focusTime * 60 - savedFocusTimeLeft : 0);
-  const minFocusMinutes = Math.min(focusTime, Math.max(1, Math.ceil(focusElapsed / 60) + 1));
+  const minFocusMinutes = Math.max(1, Math.floor(focusElapsed / 60) + 1);
 
   const breakElapsed = mode === 'break' ? breakTime * 60 - timeLeft : (savedBreakTimeLeft !== null ? breakTime * 60 - savedBreakTimeLeft : 0);
-  const minBreakMinutes = Math.min(breakTime, Math.max(1, Math.ceil(breakElapsed / 60) + 1));
+  const minBreakMinutes = Math.max(1, Math.floor(breakElapsed / 60) + 1);
 
   // Toast logic moved to global ToastManager
 

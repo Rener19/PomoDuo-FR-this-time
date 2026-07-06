@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "PomoDuo-FR-this-time",
-    "slug": "PomoDuo-FR-this-time",
+    "name": "PomoDuo",
+    "slug": "PomoDuo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -25,7 +25,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.PomoDuoFRthistime"
+      "package": "com.anonymous.pomoduo"
     },
     "web": {
       "output": "static",
@@ -38,9 +38,7 @@
         {
           "android": {
             "foregroundService": {
-              "types": [
-                "specialUse"
-              ],
+              "types": ["specialUse"],
               "specialUseSubtype": "Timer for focus sessions"
             }
           }
@@ -56,7 +54,8 @@
           }
         }
       ],
-      "./withAndroidAlarmSound.js"
+      "./withAndroidAlarmSound.js",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,
