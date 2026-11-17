@@ -13,6 +13,7 @@ expo-env.d.ts
 .kotlin/
 *.orig.*
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
@@ -25,6 +26,7 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+*.log
 
 # macOS
 .DS_Store
@@ -41,3 +43,21 @@ example
 # generated native folders
 /ios
 /android
+
+# Editor & Workspace
+*.code-workspace
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.claude/
+
+# EAS configuration
+eas.json
+
+# Local scripts & Agent tools
+.agents/
+__pycache__/
+*.pyc
+sample
+screens_cmd.bat
+enable_long_paths.ps1
