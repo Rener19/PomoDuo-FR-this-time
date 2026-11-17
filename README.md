@@ -1,4 +1,4 @@
-# 🍅 PomoDuo — Collaborative Pomodoro Focus & Accountability
+# PomoDuo — Collaborative Pomodoro Focus & Accountability
 
 [![React Native](https://img.shields.io/badge/React%20Native-0.85-61DAFB?logo=react&logoColor=black)](https://reactnative.dev/)
 [![Expo](https://img.shields.io/badge/Expo%20SDK-56-000020?logo=expo&logoColor=white)](https://expo.dev/)
