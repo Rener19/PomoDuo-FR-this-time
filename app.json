@@ -4,11 +4,13 @@
     "slug": "PomoDuo",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "pomoduofrthistime",
+    "icon": "./assets/images/pomoduo-icon.jpg",
+    "scheme": "pomoduo",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/pomoduo-icon.jpg",
+      "bundleIdentifier": "com.rainieraquino.pomoduo",
+      "buildNumber": "1"
     },
     "android": {
       "permissions": [
@@ -25,7 +27,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.pomoduo"
+      "package": "com.rainieraquino.pomoduo",
+      "versionCode": 1
     },
     "web": {
       "output": "static",
@@ -49,8 +52,8 @@
         {
           "backgroundColor": "#208AEF",
           "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
+            "image": "./assets/images/pomoduo-splash.jpg",
+            "imageWidth": 1024
           }
         }
       ],

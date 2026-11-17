@@ -203,10 +203,18 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
              savedFocusTimeLeft: state.savedFocusTimeLeft,
              savedBreakTimeLeft: state.savedBreakTimeLeft,
            });
+           
+           // Burn chat history when room becomes empty (except for host)
+           if (state.sessionId) {
+              supabase.from('duo_chat_messages').delete().eq('session_id', state.sessionId).then(({ error }) => {
+                if (error) console.error('Failed to delete chat messages:', error);
+              });
+           }
         }
         
         return {
           participants: newParticipants,
+          chatMessages: shouldWait ? [] : state.chatMessages,
           waitingForFriends: state.isHost ? shouldWait : state.waitingForFriends,
         };
       });
@@ -247,15 +255,23 @@ function setupChannel(channel: RealtimeChannel, set: any, get: any) {
            const myId = useAuthStore.getState().user?.id;
            if (myId) {
               supabase.from('duo_sessions').update({ host_id: myId }).eq('id', sessionId).then(() => {
-                 set({ hostId: myId, isHost: true, waitingForFriends: true });
+                 set({ hostId: myId, isHost: true, waitingForFriends: true, chatMessages: [] });
                  // If the session is empty after I claim host (e.g., I was the only one left and I leave later), 
                  // the normal leaveSession logic will cleanly wipe it out.
+                 supabase.from('duo_chat_messages').delete().eq('session_id', sessionId).then();
               });
+           }
+        }
+        
+        if (isHost && shouldWait) {
+           if (sessionId) {
+              supabase.from('duo_chat_messages').delete().eq('session_id', sessionId).then();
            }
         }
         
         return {
           participants: newParticipants,
+          chatMessages: shouldWait ? [] : state.chatMessages,
           waitingForFriends: state.isHost ? shouldWait : state.waitingForFriends,
         };
       });

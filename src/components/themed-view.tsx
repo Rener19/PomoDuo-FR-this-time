@@ -1,6 +1,6 @@
 import { ViewProps, StyleSheet } from 'react-native';
 import React, { useState } from 'react';
-import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, withTiming, useSharedValue } from 'react-native-reanimated';
 import { useIsFocused } from 'expo-router';
 
 import { ThemeColor } from '@/constants/theme';
@@ -22,15 +22,20 @@ export function ThemedView({ style, lightColor, darkColor, type, ...otherProps }
 
   // Store the initial background to prevent Reanimated from reading unparseable native defaults
   const [initialBg] = useState(targetBg);
+  const bgSV = useSharedValue(targetBg);
+
+  React.useEffect(() => {
+    bgSV.value = withTiming(targetBg, { duration: 400 });
+  }, [targetBg]);
 
   const animatedStyle = useAnimatedStyle(() => {
     if (hasExplicitBackground || targetBg === 'transparent') {
       return {};
     }
     return {
-      backgroundColor: withTiming(targetBg, { duration: 150 }),
+      backgroundColor: bgSV.value,
     };
-  }, [hasExplicitBackground, targetBg]);
+  }, [hasExplicitBackground]);
 
   return <Animated.View style={[{ backgroundColor: initialBg }, style, animatedStyle]} {...otherProps} />;
 }

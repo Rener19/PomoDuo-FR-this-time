@@ -1,6 +1,6 @@
 import { Platform, StyleSheet, TextProps } from 'react-native';
 import React, { useState } from 'react';
-import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, withTiming, useSharedValue } from 'react-native-reanimated';
 import { useIsFocused } from 'expo-router';
 
 import { Fonts, ThemeColor } from '@/constants/theme';
@@ -32,15 +32,20 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
 
   // Store the initial color to prevent Reanimated from reading unparseable Android native defaults
   const [initialColor] = useState(textColor);
+  const colorSV = useSharedValue(textColor);
+
+  React.useEffect(() => {
+    colorSV.value = withTiming(textColor, { duration: 400 });
+  }, [textColor]);
 
   const animatedStyle = useAnimatedStyle(() => {
     if (hasExplicitColor) {
       return {};
     }
     return {
-      color: withTiming(textColor, { duration: 150 }),
+      color: colorSV.value,
     };
-  }, [textColor, hasExplicitColor]);
+  }, [hasExplicitColor]);
 
   return (
     <Animated.Text

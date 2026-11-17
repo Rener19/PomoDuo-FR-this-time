@@ -43,7 +43,7 @@ export function TimerRing({ size = defaultSize, strokeWidth = 8 }) {
   const strokeDashoffset = useSharedValue(circumference);
   useEffect(() => {
     strokeDashoffset.value = withTiming(circumference * (1 - progress), {
-      duration: isRunning ? 1000 : 150,
+      duration: isRunning ? 1000 : 400,
       easing: Easing.linear,
     });
   }, [progress, circumference, isRunning]);
@@ -54,27 +54,38 @@ export function TimerRing({ size = defaultSize, strokeWidth = 8 }) {
   const modeTransition = useSharedValue(isFocus ? 1 : 0);
   
   useEffect(() => {
-    modeTransition.value = withTiming(isFocus ? 1 : 0, { duration: 150 });
+    modeTransition.value = withTiming(isFocus ? 1 : 0, { duration: 400 });
   }, [isFocus]);
 
   const animatedBgCircleProps = useAnimatedProps(() => {
-    const stroke = withTiming(isFocus ? focusColors.timerCircle : breakColors.timerCircle, { duration: 150 });
+    const stroke = interpolateColor(
+      modeTransition.value,
+      [0, 1],
+      [breakColors.timerCircle, focusColors.timerCircle]
+    );
     return { stroke };
-  }, [isFocus, breakColors, focusColors]);
+  }, [breakColors, focusColors]);
 
   const animatedProgressProps = useAnimatedProps(() => {
-    const stroke = withTiming(isFocus ? focusColors.timerProgress : breakColors.timerProgress, { duration: 150 });
+    const stroke = interpolateColor(
+      modeTransition.value,
+      [0, 1],
+      [breakColors.timerProgress, focusColors.timerProgress]
+    );
     return {
       strokeDashoffset: strokeDashoffset.value,
       stroke,
     };
-  }, [isFocus, strokeDashoffset, breakColors, focusColors]);
+  }, [strokeDashoffset, breakColors, focusColors]);
 
   const animatedTextStyle = useAnimatedStyle(() => {
-    return {
-      color: withTiming(isFocus ? focusColors.timerProgress : breakColors.timerProgress, { duration: 150 }),
-    };
-  }, [isFocus, focusColors, breakColors]);
+    const color = interpolateColor(
+      modeTransition.value,
+      [0, 1],
+      [breakColors.timerProgress, focusColors.timerProgress]
+    );
+    return { color };
+  }, [breakColors, focusColors]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
