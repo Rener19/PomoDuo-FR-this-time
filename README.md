@@ -68,7 +68,6 @@ Recruiters, hiring managers, and testers can download the standalone Android APK
 | **Authentication** | [Google Sign-In](https://github.com/react-native-google-signin/google-signin) & Supabase Auth |
 | **Animations** | [React Native Reanimated 4](https://docs.swmansion.com/react-native-reanimated/) |
 | **Graphics** | [React Native SVG](https://github.com/software-mansion/react-native-svg) |
-| **Typography** | Plus Jakarta Sans & Literata (`@expo-google-fonts`) |
 
 ---
 
