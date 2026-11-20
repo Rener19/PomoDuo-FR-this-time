@@ -20,6 +20,18 @@ Recruiters, hiring managers, and testers can download the standalone Android APK
 
 ---
 
+## 📸 App Screenshots
+
+| Solo Focus (25m) | Focus Running (SVG Ring) | Break Interval (Blue) | Duo Session Invite |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/screenshots/01_solo_focus_timer.png" width="200" /> | <img src="assets/screenshots/02_solo_focus_running.png" width="200" /> | <img src="assets/screenshots/03_solo_break_timer.png" width="200" /> | <img src="assets/screenshots/04_duo_session.png" width="200" /> |
+
+| Friends & Requests | Global Leaderboard | Profile & Productivity Stats |
+|:---:|:---:|:---:|
+| <img src="assets/screenshots/05_friends_screen.png" width="200" /> | <img src="assets/screenshots/06_leaderboard_screen.png" width="200" /> | <img src="assets/screenshots/07_profile_screen.png" width="200" /> |
+
+---
+
 ## ✨ Key Features
 
 ### 👥 Real-Time Duo Focus Rooms
